@@ -37,6 +37,40 @@ export interface ManifestAnim {
     fx?: boolean;
     /** Opacity of a character effect (default 1), for see-through effects like Law's Room dome. */
     alpha?: number;
+    /** Effect drawn behind the fighters (a giant spirit rising at the back). */
+    behind?: boolean;
+}
+
+/**
+ * One layer of an ultimate's cut-in sequence, timed in ticks from the start
+ * of the screen freeze. Render only: the engine never reads it.
+ *
+ * - `full`: the image covers the screen (a background, a close-up).
+ * - `band`: the image fills a horizontal band across the middle.
+ * - `left` / `right` / `center`: the image stands on that part of the screen.
+ * - `name`: the usual band with the move's name and the fighter's cut-in.
+ * - `fighter`: the move's sprite (or `anim`) drawn large in the middle, over
+ *   the panels below it in the list.
+ * `enter` animates the first ticks: a slide from the side, a zoom from
+ * large, a white flash. `sfx` plays when the layer appears.
+ */
+export interface CinematicPanel {
+    from: number;
+    to: number;
+    layout: 'full' | 'band' | 'left' | 'right' | 'center' | 'name' | 'fighter';
+    image?: string;
+    anim?: string;
+    enter?: 'slide' | 'zoom' | 'flash' | 'none';
+    /** Slow drift in screen pixels per tick, [x, y]. */
+    drift?: [number, number];
+    /** Scale of the image (default: fit the layout). */
+    scale?: number;
+    /** Vertical position of a band or a standing image, in screen pixels. */
+    y?: number;
+    alpha?: number;
+    /** Additive blending (light, flames). */
+    additive?: boolean;
+    sfx?: string;
 }
 
 export interface SpriteManifest {
@@ -44,6 +78,8 @@ export interface SpriteManifest {
     image: string;
     anims: Record<string, ManifestAnim>;
     images: Record<string, { src: string; w: number; h: number }>;
+    /** Cut-in sequences of the ultimates, by move slot (render only). */
+    cinematics?: Record<string, CinematicPanel[]>;
 }
 
 // ——— Character data ———
@@ -139,8 +175,9 @@ export interface MoveDef {
     superFreeze?: number;
     /** Sound on start. */
     sfx?: string;
-    /** Visual effect played at a frame: [frame, fxAnim, x, y] (fxAnim in common or character manifest). */
-    fx?: [number, string, number, number][];
+    /** Visual effect played at a frame: [frame, fxAnim, x, y, sfx?] (fxAnim in
+     *  common or character manifest; the sound, if any, plays with it). */
+    fx?: ([number, string, number, number] | [number, string, number, number, string])[];
 }
 
 export interface CharacterDef {
@@ -305,7 +342,7 @@ export type GameEvent =
     | { type: 'block'; x: number; y: number; attacker: number }
     | { type: 'whiff'; side: number; heavy: boolean }
     | { type: 'move'; side: number; slot: string; sfx?: string }
-    | { type: 'fx'; side: number; anim: string; x: number; y: number; facing: 1 | -1 }
+    | { type: 'fx'; side: number; anim: string; x: number; y: number; facing: 1 | -1; sfx?: string }
     | { type: 'dust'; x: number; y: number; big: boolean }
     | { type: 'jump'; side: number }
     | { type: 'land'; side: number; heavy: boolean }

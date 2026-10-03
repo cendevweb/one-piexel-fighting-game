@@ -272,4 +272,20 @@ describe('engine', () => {
         expect(s.phase).toBe('matchEnd');
         expect(s.winner).toBe(0);
     });
+
+    it('reports an effect with the sound it carries, on the frame it plays', () => {
+        const s = fight();
+        closeIn(s);
+        const def = getChar('luffy');
+        const move = def.moves.heavy;
+        const saved = move.fx;
+        move.fx = [[1, 'idle', 10, 20, 'slashHeavy']];
+        try {
+            const events = [...tap(s, heavy), ...hold(s, 0, 0, 30)];
+            const fx = events.find((e) => e.type === 'fx');
+            expect(fx).toMatchObject({ type: 'fx', anim: 'idle', sfx: 'slashHeavy' });
+        } finally {
+            move.fx = saved;
+        }
+    });
 });

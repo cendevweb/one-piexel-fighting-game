@@ -173,7 +173,7 @@ def build(cid: str, src: dict, contact_dir: str | None) -> None:
             dx, dy = a["nudges"].get(str(i), [0, 0])
             frames.append([c["x"], c["y"], w, h, c["ax"] - dx, c["ay"] - dy, reach(c["img"], c["ax"] - dx, c["ay"] - dy, front)])
         entry = {"frames": frames}
-        for k in ("fps", "loop", "fx", "alpha"):
+        for k in ("fps", "loop", "fx", "alpha", "behind"):
             if k in a["anim"]:
                 entry[k] = a["anim"][k]
         manifest["anims"][name] = entry
@@ -201,6 +201,10 @@ def build(cid: str, src: dict, contact_dir: str | None) -> None:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
         img.save(os.path.join(PUBLIC, f"{cid}-{name}.png"), optimize=True)
         manifest["images"][name] = {"src": f"sprites/{cid}-{name}.png", "w": img.width, "h": img.height}
+
+    # Ultimate cut-in sequences (render only), copied as written.
+    if src.get("cinematics"):
+        manifest["cinematics"] = src["cinematics"]
 
     with open(os.path.join(GENERATED, f"{cid}.json"), "w") as f:
         json.dump(manifest, f, separators=(",", ":"))
