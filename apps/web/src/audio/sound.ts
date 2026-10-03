@@ -133,6 +133,27 @@ const SOUNDS: Record<string, (t: number) => void> = {
         tone(t + 0.03, 'triangle', 2400, 1900, { d: 0.25, peak: 0.07 });
         tone(t + 0.03, 'sine', 3600, 3300, { d: 0.2, peak: 0.05 });
     },
+    /** Iai: a blade leaving its sheath, a bright metallic shing. */
+    iai: (t) => {
+        noise(t, 0.08, 'highpass', 4000, 9000, { d: 0.07, peak: 0.3 }, 2);
+        tone(t + 0.02, 'sine', 4200, 3900, { d: 0.45, peak: 0.09 });
+        tone(t + 0.02, 'triangle', 2800, 2700, { d: 0.35, peak: 0.07 });
+    },
+    /** ゴゴゴゴ: a menacing rumble rolling in four waves. */
+    menace: (t) => {
+        for (let i = 0; i < 4; i++) noise(t + i * 0.13, 0.16, 'lowpass', 420, 120, { a: 0.03, d: 0.13, peak: 0.42 });
+        tone(t, 'sawtooth', 55, 48, { a: 0.1, d: 0.5, peak: 0.16 });
+    },
+    /** Ashura: a temple gong under a deep drone, the nine swords drawn. */
+    ashura: (t) => {
+        tone(t, 'sine', 98, 92, { a: 0.01, d: 1.4, peak: 0.4 });
+        tone(t, 'triangle', 196, 186, { a: 0.01, d: 1.1, peak: 0.16 });
+        tone(t, 'sine', 523, 517, { a: 0.01, d: 0.9, peak: 0.07 });
+        tone(t + 0.05, 'sawtooth', 49, 44, { a: 0.3, d: 1.0, peak: 0.12 });
+        noise(t, 0.6, 'lowpass', 600, 90, { a: 0.02, d: 0.55, peak: 0.25 });
+    },
+    /** A whirl of blades cutting the air, rising. */
+    whirl: (t) => { for (let i = 0; i < 6; i++) noise(t + i * 0.06, 0.08, 'bandpass', 1400 + i * 400, 3000 + i * 500, { d: 0.07, peak: 0.22 }, 1.5); },
     /** A string pulled taut: a short, bent twang. */
     thread: (t) => {
         tone(t, 'triangle', 1500, 700, { d: 0.12, peak: 0.16 });

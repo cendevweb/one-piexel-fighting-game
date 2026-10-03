@@ -2,15 +2,19 @@ import manifest from '../generated/sprites/zoro.json';
 import type { CharacterDef, SpriteManifest } from '../engine/types';
 
 /**
- * Roronoa Zoro (après l'ellipse) — the swordsman. Santōryū: long sword
- * normals, a flying slash (Sanjūroku Pound Hō) for mid range, the Oni Giri
- * dash that crosses half the screen, the Tatsumaki tornado and the rising
- * Ō Tatsumaki as his reversal; Rokudō no Tsuji is the ultimate.
+ * Roronoa Zoro — the three-sword swordsman, rebuilt from the Gigant Battle
+ * sheet "Roronoa Zoro 3" (tools/sprites/chars/zoro.json).
  *
- * Every animation and effect comes from the Gigant Battle 2 sheet
- * (tools/sprites/chars/zoro.json): the blue crescents, the Oni Giri trail,
- * the ice spikes of the dive and the six-petal burst are the sheet's own
- * effect rows. Every `durations` array has one entry per animation frame.
+ * Normals are his Nitōryū and Santōryū cuts; the specials are his anime
+ * techniques: the Sanjūroku Pound Hō flying slash, the Oni Giri dash, the
+ * rising Nobori Ryū, the Tatsumaki tornado, the Tora Gari dive and the
+ * Gazami Dori crab-claw throw. The ultimate is Santōryū Ōgi Sanzen Sekai:
+ * the swords spin, Zoro cuts through and the blow lands after he has passed,
+ * leaving his blue afterimage and the ゴゴゴゴ. The two-bar ultimate is
+ * Kyūtōryū Ashura: the three-faced cut-in over the red background, the red
+ * Asura rising behind him, nine swords, then Ichibugin through the opponent.
+ * The sheet's own lettering (ドン!!, ドゴォン!!!, ズバッ!!…) plays with the
+ * blows it belongs to. Every `durations` array has one entry per frame.
  */
 export const zoro: CharacterDef = {
     id: 'zoro',
@@ -24,161 +28,173 @@ export const zoro: CharacterDef = {
     jump: [2.3, 7.2],
     gravity: 0.37,
     width: 12,
-    height: 64,
-    crouchHeight: 44,
+    height: 62,
+    crouchHeight: 42,
     color: '#3f9a4a',
     manifest: manifest as unknown as SpriteManifest,
     moves: {
         lightA: {
-            name: 'Estoc', anim: 'lightA', kind: 'normal', stance: 'stand',
+            name: 'Coup de garde', anim: 'lightA', kind: 'normal', stance: 'stand',
             durations: [3, 2, 3, 7],
-            hits: [{ frames: [1, 2], box: [6, 30, 44, 12], damage: 30, guard: 'mid', hitstun: 14, blockstun: 9, push: 6, hitstop: 6, spark: 'cut' }],
-            chain: ['lightB', 'crouchLight', 'heavy', 'heavyFwd', 'heavyBack', 'crouchHeavy'], cancelable: true, sfx: 'slash'
+            hits: [{ frames: [1, 2], box: [4, 34, 34, 14], damage: 28, guard: 'mid', hitstun: 14, blockstun: 9, push: 6, hitstop: 6, spark: 'light' }],
+            chain: ['lightB', 'crouchLight', 'heavy', 'heavyFwd', 'heavyBack', 'crouchHeavy'], cancelable: true, sfx: 'swing'
         },
         lightB: {
-            name: 'Revers de sabre', anim: 'lightB', kind: 'normal', stance: 'stand',
-            durations: [3, 3, 3, 7],
-            hits: [{ frames: [1, 2], box: [4, 18, 36, 34], damage: 34, guard: 'mid', hitstun: 16, blockstun: 10, push: 7, hitstop: 7, spark: 'cut' }],
+            name: 'Nitōryū — taille croisée', anim: 'lightB', kind: 'normal', stance: 'stand',
+            durations: [3, 2, 3, 3, 5, 5],
+            hits: [{ frames: [1, 2], box: [2, 12, 46, 46], damage: 36, guard: 'mid', hitstun: 16, blockstun: 10, push: 7, hitstop: 7, spark: 'cut' }],
             chain: ['lightC', 'heavy', 'heavyFwd', 'crouchHeavy'], cancelable: true, sfx: 'slash'
         },
         lightC: {
-            name: 'Santōryū — taille croisée', anim: 'lightC', kind: 'normal', stance: 'stand',
-            durations: [4, 3, 3, 4, 6, 8],
-            hits: [{ frames: [1, 3], box: [2, 4, 44, 50], damage: 52, guard: 'mid', hitstun: 18, blockstun: 12, push: 20, hitstop: 9, spark: 'cut', shake: 2 }],
-            cancelable: true, sfx: 'slash'
+            name: 'Nitōryū — balayage', anim: 'lightC', kind: 'normal', stance: 'stand',
+            durations: [4, 3, 3, 3, 3, 4, 6, 6],
+            hits: [{ frames: [3, 4], box: [0, 4, 58, 40], damage: 54, guard: 'mid', hitstun: 20, blockstun: 12, push: 20, hitstop: 9, spark: 'blade', shake: 2 }],
+            cancelable: true, sfx: 'slashHeavy'
         },
         crouchLight: {
-            name: 'Taille basse', anim: 'crouchLight', kind: 'normal', stance: 'crouch',
+            name: 'Estoc bas', anim: 'crouchLight', kind: 'normal', stance: 'crouch',
             durations: [3, 3, 6],
-            hits: [{ frames: [1, 1], box: [6, 2, 28, 18], damage: 24, guard: 'low', hitstun: 12, blockstun: 8, push: 8, hitstop: 6, spark: 'cut' }],
+            hits: [{ frames: [1, 1], box: [6, 2, 40, 16], damage: 24, guard: 'low', hitstun: 12, blockstun: 8, push: 8, hitstop: 6, spark: 'cut' }],
             chain: ['crouchLight', 'lightB', 'crouchHeavy'], cancelable: true, sfx: 'slash'
         },
         crouchHeavy: {
-            name: 'Fauchage des trois sabres', anim: 'crouchHeavy', kind: 'normal', stance: 'crouch',
-            durations: [5, 3, 3, 4, 5, 10],
-            hits: [{ frames: [2, 4], box: [6, 0, 50, 24], damage: 68, guard: 'low', hitstun: 20, blockstun: 12, push: 14, knockdown: true, launch: [1.2, 2.6], hitstop: 10, spark: 'blade' }],
+            name: 'Fauchage rasant', anim: 'crouchHeavy', kind: 'normal', stance: 'crouch',
+            durations: [5, 3, 4, 4, 10],
+            hits: [{ frames: [1, 3], box: [4, 0, 54, 20], damage: 66, guard: 'low', hitstun: 20, blockstun: 12, push: 14, knockdown: true, launch: [1.2, 2.6], hitstop: 10, spark: 'blade' }],
             cancelable: true, sfx: 'slash'
         },
         heavy: {
-            name: 'Ittōryū — taille descendante', anim: 'heavy', kind: 'normal', stance: 'stand',
-            durations: [4, 4, 3, 4, 6, 8],
-            hits: [{ frames: [2, 3], box: [2, 6, 46, 72], damage: 74, guard: 'mid', hitstun: 21, blockstun: 14, push: 20, hitstop: 11, spark: 'blade', shake: 2 }],
+            name: 'Santōryū — taille des trois sabres', anim: 'heavy', kind: 'normal', stance: 'stand',
+            durations: [4, 5, 3, 3, 4, 5, 6, 8],
+            hits: [{ frames: [2, 4], box: [0, 4, 58, 64], damage: 74, guard: 'mid', hitstun: 21, blockstun: 14, push: 20, hitstop: 11, spark: 'blade', shake: 2 }],
             cancelable: true, sfx: 'slashHeavy'
         },
+        // An overhead: the step-in vertical chop of the sheet's second row.
         heavyFwd: {
-            name: 'Tora Gari', anim: 'heavyFwd', kind: 'normal', stance: 'stand',
-            durations: [4, 4, 4, 3, 3, 5, 6, 6],
-            hits: [{ frames: [3, 4], box: [6, 0, 44, 70], damage: 80, guard: 'high', hitstun: 22, blockstun: 14, push: 14, hitstop: 12, spark: 'blade', shake: 4 }],
+            name: 'Ushi Bari', anim: 'heavyFwd', kind: 'normal', stance: 'stand',
+            durations: [5, 4, 3, 3, 3, 4, 6, 6, 6],
+            motion: [[2, 3.2, 0], [4, 0, 0]],
+            hits: [{ frames: [3, 5], box: [0, 0, 50, 72], damage: 80, guard: 'high', hitstun: 22, blockstun: 14, push: 14, hitstop: 12, spark: 'blade', shake: 4 }],
             cancelable: true, sfx: 'slashHeavy'
         },
+        // The spinning cut: lifts the opponent, then the crescent at the end.
         heavyBack: {
-            name: 'Taille ascendante', anim: 'heavyBack', kind: 'normal', stance: 'stand',
-            durations: [4, 3, 3, 4, 6, 7],
-            hits: [{ frames: [1, 3], box: [0, 18, 44, 64], damage: 64, guard: 'mid', hitstun: 22, blockstun: 12, push: 8, launch: [0.6, 6.4], hitstop: 10, spark: 'blade' }],
+            name: 'Taka Nami', anim: 'heavyBack', kind: 'normal', stance: 'stand',
+            durations: [4, 3, 3, 3, 3, 3, 3, 3, 3, 4, 9],
+            hits: [
+                { frames: [2, 4], box: [-6, 20, 46, 60], damage: 40, guard: 'mid', hitstun: 30, blockstun: 12, push: 4, launch: [0.4, 5.8], hitstop: 8, spark: 'cut' },
+                { frames: [9, 9], box: [-4, 0, 60, 60], damage: 36, guard: 'mid', hitstun: 22, blockstun: 12, push: 10, launch: [1.6, 4.4], hitstop: 10, spark: 'blade' }
+            ],
             invuln: [1, 2],
             cancelable: true, sfx: 'slash'
         },
         airLight: {
             name: 'Taille aérienne', anim: 'airLight', kind: 'normal', stance: 'air',
-            durations: [4, 10],
-            hits: [{ frames: [1, 1], box: [-2, 4, 44, 30], damage: 34, guard: 'high', hitstun: 14, blockstun: 9, push: 8, hitstop: 7, spark: 'cut' }],
+            durations: [3, 3, 10],
+            hits: [{ frames: [1, 2], box: [-2, 0, 46, 44], damage: 34, guard: 'high', hitstun: 14, blockstun: 9, push: 8, hitstop: 7, spark: 'cut' }],
             chain: ['airHeavy'], cancelable: true, sfx: 'slash'
         },
         airHeavy: {
             name: 'Croissant aérien', anim: 'airHeavy', kind: 'normal', stance: 'air',
-            durations: [3, 4, 4, 6, 8],
-            hits: [{ frames: [1, 2], box: [0, 8, 52, 46], damage: 66, guard: 'high', hitstun: 18, blockstun: 12, push: 12, hitstop: 10, spark: 'blade' }],
-            cancelable: true, landLag: 5, sfx: 'slash'
+            durations: [4, 4, 4, 5, 8],
+            hits: [{ frames: [1, 3], box: [-4, -8, 54, 56], damage: 66, guard: 'high', hitstun: 18, blockstun: 12, push: 12, hitstop: 10, spark: 'blade' }],
+            cancelable: true, landLag: 5, sfx: 'slashHeavy'
         },
+        // Upside down, the three swords first, into the ground: ズバッ!!
         airSpecial: {
-            name: 'Santōryū — plongée des trois sabres', anim: 'airSpecial', kind: 'special', stance: 'air',
-            durations: [4, 3, 3, 30, 4, 6, 8],
-            motion: [[1, 2.2, -6.0]],
+            name: 'Santōryū — Tora Gari', anim: 'airSpecial', kind: 'special', stance: 'air',
+            durations: [4, 3, 3, 3, 30, 5, 5, 6, 8, 8],
+            motion: [[2, 2.4, -6.0]],
             noGravity: true, landFrame: 5,
-            hits: [{ frames: [1, 4], box: [-6, -6, 40, 44], damage: 82, guard: 'high', hitstun: 20, blockstun: 14, push: 16, knockdown: true, launch: [1.6, 3.6], hitstop: 12, spark: 'blade', shake: 4 }],
-            fx: [[5, 'fx_spikes', 14, 0]],
+            hits: [{ frames: [2, 5], box: [-8, -10, 44, 52], damage: 84, guard: 'high', hitstun: 20, blockstun: 14, push: 16, knockdown: true, launch: [1.6, 3.6], hitstop: 12, spark: 'blade', shake: 4 }],
+            fx: [[5, 'fx_spark', 18, 10, 'slashHeavy'], [5, 'fx_zuba', 4, 66]],
             sfx: 'slashHeavy'
         },
         specialN: {
             name: 'Sanjūroku Pound Hō', anim: 'specialN', kind: 'special', stance: 'stand',
-            durations: [4, 3, 4, 3, 3, 4, 6, 6, 6],
+            durations: [3, 3, 3, 3, 3, 4, 5, 6, 6, 6, 6],
             hits: [],
             projectile: {
-                anim: 'fx_pound', atFrame: 3, offset: [34, 34], speed: 4.4, life: 80,
-                box: [-14, -24, 28, 48], fps: 12, hits: 1,
+                anim: 'fx_pound', atFrame: 5, offset: [40, 34], speed: 4.6, life: 80,
+                box: [-30, -12, 60, 24], fps: 12, hits: 1,
                 hit: { damage: 80, guard: 'mid', hitstun: 22, blockstun: 16, push: 18, hitstop: 11, spark: 'blade', shake: 2, sfx: 'slashHeavy' }
             },
+            fx: [[5, 'fx_thrust', 44, 34, 'iai'], [6, 'fx_vo', 20, 70]],
             sfx: 'slashHeavy'
         },
+        // The swords crossed in front, the one in his mouth, then the dash.
         specialF: {
             name: 'Oni Giri', anim: 'specialF', kind: 'special', stance: 'stand',
-            durations: [4, 5, 4, 3, 3, 6, 8, 8, 6],
-            motion: [[3, 6.4, 0], [5, 0, 0]],
-            hits: [{ frames: [3, 5], box: [-6, 6, 52, 46], damage: 96, guard: 'mid', hitstun: 24, blockstun: 14, push: 22, launch: [3.0, 3.6], hitstop: 14, spark: 'blade', shake: 4 }],
-            fx: [[5, 'fx_beam', -6, 26]],
-            sfx: 'slashHeavy'
+            durations: [3, 3, 3, 4, 3, 3, 3, 3, 4, 6, 8],
+            motion: [[4, 6.8, 0], [6, 0, 0]],
+            hits: [{ frames: [4, 6], box: [-8, 4, 56, 50], damage: 96, guard: 'mid', hitstun: 24, blockstun: 14, push: 22, launch: [3.0, 3.6], hitstop: 14, spark: 'blade', shake: 4 }],
+            fx: [[6, 'fx_don', 0, 72, 'slashHeavy']],
+            sfx: 'iai'
         },
+        // Rising flare of the swords: the reversal. ドヒュッ!!!
         specialU: {
-            name: 'Ō Tatsumaki', anim: 'specialU', kind: 'special', stance: 'stand',
-            durations: [3, 3, 4, 4, 4, 5, 7, 7, 6, 8],
-            motion: [[1, 1.2, 6.4]],
-            invuln: [0, 3],
+            name: 'Nitōryū — Nobori Ryū', anim: 'specialU', kind: 'special', stance: 'stand',
+            durations: [3, 3, 4, 5, 5, 6, 8, 8],
+            motion: [[2, 1.0, 6.6]],
+            invuln: [0, 2],
             hits: [
-                { frames: [1, 3], box: [-10, 14, 48, 64], damage: 62, guard: 'mid', hitstun: 24, blockstun: 16, push: 8, launch: [0.8, 6.8], hitstop: 10, spark: 'blade', shake: 3 },
-                { frames: [4, 5], box: [-10, 14, 48, 64], damage: 46, guard: 'mid', hitstun: 24, blockstun: 16, push: 10, launch: [1.2, 7.4], hitstop: 10, spark: 'big', shake: 4 }
+                { frames: [2, 3], box: [-10, 10, 50, 70], damage: 62, guard: 'mid', hitstun: 24, blockstun: 16, push: 8, launch: [0.8, 6.8], hitstop: 10, spark: 'blade', shake: 3 },
+                { frames: [4, 4], box: [-10, 20, 50, 60], damage: 44, guard: 'mid', hitstun: 24, blockstun: 16, push: 10, launch: [1.2, 7.2], hitstop: 10, spark: 'big', shake: 4 }
             ],
-            fx: [[2, 'fx_rise', 14, 44]],
+            fx: [[2, 'fx_pillar', 6, 0, 'slashHeavy']],
             sfx: 'slashHeavy'
         },
         specialD: {
             name: 'Tatsumaki', anim: 'specialD', kind: 'special', stance: 'stand',
-            durations: [6, 5, 6, 6, 5, 6, 8, 8],
+            durations: [5, 5, 6, 6, 6, 6, 8, 8, 8],
             hits: [
-                { frames: [2, 3], box: [-16, 0, 60, 80], damage: 22, guard: 'mid', hitstun: 22, blockstun: 10, push: 2, rehit: 4, hitstop: 4, spark: 'blade' },
-                { frames: [4, 4], box: [-10, 0, 56, 70], damage: 56, guard: 'mid', hitstun: 26, blockstun: 16, push: 12, launch: [1.4, 6.6], hitstop: 12, spark: 'big', shake: 4 }
+                { frames: [2, 3], box: [-18, 0, 62, 80], damage: 22, guard: 'mid', hitstun: 22, blockstun: 10, push: 2, rehit: 4, hitstop: 4, spark: 'blade' },
+                { frames: [4, 4], box: [-12, 0, 58, 72], damage: 56, guard: 'mid', hitstun: 26, blockstun: 16, push: 12, launch: [1.4, 6.6], hitstop: 12, spark: 'big', shake: 4 }
             ],
-            fx: [[2, 'fx_cut', 22, 36]],
+            fx: [[2, 'fx_wind', 4, 40, 'whirl']],
             sfx: 'slashHeavy'
         },
         ultimate: {
-            name: 'Santōryū Ōgi — Rokudō no Tsuji', anim: 'ultimate', kind: 'ultimate', stance: 'stand',
-            durations: [8, 8, 6, 6, 3, 3, 5, 6, 6, 6, 8, 10, 12],
-            superFreeze: 55, cost: 100, invuln: [0, 7],
-            motion: [[4, 7.2, 0], [6, 0, 0]],
+            name: 'Santōryū Ōgi — Sanzen Sekai', anim: 'ultimate', kind: 'ultimate', stance: 'stand',
+            durations: [3, 3, 3, 3, 3, 4, 4, 4, 4, 3, 3, 4, 4, 6, 24, 8, 8, 8, 8],
+            superFreeze: 84, cost: 100, invuln: [0, 13],
+            motion: [[11, 10, 0], [13, 0, 0]],
+            passThrough: [11, 13],
             hits: [
-                { frames: [4, 6], box: [-8, 0, 64, 60], damage: 30, guard: 'mid', hitstun: 60, blockstun: 20, push: 1, rehit: 3, hitstop: 4, spark: 'blade', shake: 3 },
-                { frames: [7, 9], box: [-10, 0, 90, 90], damage: 250, guard: 'mid', hitstun: 50, blockstun: 22, push: 30, launch: [5.8, 5.6], wallBounce: true, hitstop: 24, spark: 'big', shake: 10 }
+                { frames: [6, 8], box: [0, 0, 46, 64], damage: 30, guard: 'mid', hitstun: 60, blockstun: 20, push: 0, rehit: 4, hitstop: 3, spark: 'cut', shake: 2 },
+                { frames: [11, 12], box: [-30, 0, 76, 70], damage: 50, guard: 'mid', hitstun: 70, blockstun: 20, push: 0, rehit: 4, hitstop: 4, spark: 'blade', shake: 3 },
+                { frames: [14, 14], box: [-130, 0, 134, 100], damage: 260, guard: 'mid', hitstun: 50, blockstun: 22, push: 26, launch: [2.6, 6.2], wallBounce: true, knockdown: true, hitstop: 26, spark: 'big', shake: 10, sfx: 'slashHeavy' }
             ],
-            fx: [[5, 'fx_lineA', -40, 22], [7, 'fx_rokudo', 34, 36]],
-            sfx: 'slashHeavy'
+            fx: [[5, 'fx_thrust', 20, 36, 'iai'], [13, 'fx_aura', -70, 24], [14, 'fx_gogo', -40, 76, 'menace'], [14, 'fx_burst', -44, 34, 'slashHeavy']],
+            sfx: 'iai'
         },
-        // Two bars: the Sanzen Sekai spin (the green whirl row) bores in,
-        // the pass-through slash, then the arms wind up and let the giant
-        // blue serpent wave of the 360 Pound Hō fly across the whole stage.
+        // Two bars: the nine swords and the red Asura behind him, the rings
+        // of blades, then Ichibugin cutting through.
         ultimate2: {
-            name: 'Sanbyakurokujū Pound Hō', anim: 'ultimate2', kind: 'ultimate', stance: 'stand',
-            durations: [5, 5, 3, 4, 4, 4, 4, 3, 5, 6, 6, 5, 4, 4, 4, 5, 6, 6, 8, 10, 12],
-            superFreeze: 70, cost: 200, invuln: [0, 8],
-            motion: [[2, 5.6, 0], [8, 0, 0]],
+            name: 'Kyūtōryū Ashura — Ichibugin', anim: 'ultimate2', kind: 'ultimate', stance: 'stand',
+            durations: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 6, 9, 5, 5, 4, 8, 10, 8, 8, 10],
+            superFreeze: 120, cost: 200, invuln: [0, 17],
+            motion: [[17, 9.5, 0], [18, 0, 0]],
+            passThrough: [17, 18],
             hits: [
-                { frames: [2, 7], box: [-10, 0, 62, 66], damage: 50, guard: 'mid', hitstun: 50, blockstun: 18, push: 1, rehit: 6, hitstop: 5, spark: 'blade', shake: 3 },
-                { frames: [8, 8], box: [-8, 0, 66, 72], damage: 110, guard: 'mid', hitstun: 60, blockstun: 20, push: 2, hitstop: 12, spark: 'big', shake: 5 },
-                { frames: [14, 14], box: [0, 4, 70, 70], damage: 150, guard: 'mid', hitstun: 40, blockstun: 20, push: 1, hitstop: 8, spark: 'blade', shake: 4 }
+                { frames: [13, 13], box: [-10, 0, 74, 84], damage: 60, guard: 'mid', hitstun: 80, blockstun: 20, push: 0, rehit: 3, hitstop: 4, spark: 'blade', shake: 3 },
+                { frames: [14, 15], box: [-14, 0, 84, 84], damage: 60, guard: 'mid', hitstun: 80, blockstun: 20, push: 0, rehit: 5, hitstop: 5, spark: 'blade', shake: 4 },
+                { frames: [17, 17], box: [-34, 0, 96, 84], damage: 100, guard: 'mid', hitstun: 70, blockstun: 22, push: 0, hitstop: 8, spark: 'big', shake: 6 },
+                { frames: [18, 18], box: [-140, 0, 150, 110], damage: 330, guard: 'mid', hitstun: 60, blockstun: 24, push: 30, launch: [3.0, 6.6], wallBounce: true, knockdown: true, hitstop: 30, spark: 'big', shake: 12, sfx: 'slashHeavy' }
             ],
-            projectile: {
-                anim: 'fx_wave', atFrame: 14, offset: [70, 32], speed: 5.2, life: 110,
-                box: [-80, -26, 160, 52], fps: 10, hits: 1,
-                hit: { damage: 360, guard: 'mid', hitstun: 50, blockstun: 24, push: 30, launch: [5.6, 6.0], wallBounce: true, knockdown: true, hitstop: 24, spark: 'big', shake: 10, sfx: 'slashHeavy' }
-            },
-            fx: [[3, 'fx_cut', 20, 34], [8, 'fx_diag', 30, 36], [14, 'fx_waveburst', 34, 34]],
-            sfx: 'slashHeavy'
+            fx: [
+                [6, 'fx_kanon', -6, 46, 'menace'], [13, 'fx_crescent', 30, 40, 'whirl'], [15, 'fx_burst', 36, 40],
+                [17, 'fx_dust', 0, 0, 'iai'], [18, 'fx_crescent', -50, 40, 'slashHeavy'], [18, 'fx_zubaban', -50, 40], [19, 'fx_dogon', -40, 86, 'ashura']
+            ],
+            sfx: 'ashura'
         },
+        // Gazami Dori: the two swords close like crab claws, then the cuts.
         throw: {
-            name: 'Shishi Sonson', anim: 'throw', kind: 'throw', stance: 'stand',
-            durations: [3, 4, 4, 3, 3, 6, 6, 6, 6, 8],
+            name: 'Gazami Dori', anim: 'throw', kind: 'throw', stance: 'stand',
+            durations: [3, 3, 4, 5, 3, 3, 3, 3, 3, 3, 4, 4, 5, 8],
             hits: [{ frames: [0, 1], box: [4, 10, 30, 40], damage: 0, guard: 'unblockable', hitstun: 0, blockstun: 0, push: 0 }],
-            throwRelease: { frame: 5, damage: 110, launch: [2.6, 5.0] },
-            fx: [[5, 'fx_diag', 26, 34]],
+            throwRelease: { frame: 9, damage: 110, launch: [2.6, 5.0] },
+            fx: [[7, 'fx_spark', 26, 34, 'slashHeavy']],
             sfx: 'grab'
         }
     }

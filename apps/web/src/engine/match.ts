@@ -1067,6 +1067,11 @@ function physics(state: MatchState, f: FighterState, events: GameEvent[]): void 
     }
 }
 
+function passingThrough(f: FighterState): boolean {
+    const range = f.mode === 'move' ? moveOf(f)?.passThrough : undefined;
+    return !!range && f.frame >= range[0] && f.frame <= range[1];
+}
+
 function separate(state: MatchState): void {
     const [a, b] = state.fighters;
     const da = getChar(a.char);
@@ -1074,6 +1079,7 @@ function separate(state: MatchState): void {
     // Throws hold the victim in place.
     if (a.mode === 'thrown' || b.mode === 'thrown') return;
     if (a.mode === 'down' || b.mode === 'down' || a.mode === 'ko' || b.mode === 'ko') return;
+    if (passingThrough(a) || passingThrough(b)) return;
     const minGap = (da.width + db.width) * PX;
     const dx = b.x - a.x;
     const verticalOverlap = Math.abs(a.y - b.y) < Math.min(da.height, db.height) * PX * 0.75;
