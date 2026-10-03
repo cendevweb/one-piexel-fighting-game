@@ -518,13 +518,13 @@ export class VersusScene implements Scene {
 
 // ——— Fight ———
 
-const SLOT_NOTATION: [MoveSlot, string][] = [
+const SLOT_NOTATION: [keyof CharacterDef['moves'], string][] = [
     ['lightA', '[A]'], ['lightB', '[A] [A]'], ['lightC', '[A] [A] [A]'],
     ['heavy', '[B]'], ['heavyFwd', '→ [B]'], ['heavyBack', '← [B]'],
     ['crouchLight', '↓ [A]'], ['crouchHeavy', '↓ [B]'],
     ['airLight', 'SAUT [A]'], ['airHeavy', 'SAUT [B]'], ['airSpecial', 'SAUT [C]'],
     ['specialN', '[C]  OU  ↓↘→ [C]'], ['specialF', '→ [C]'], ['specialU', '↑ [C]  OU  →↓↘ [C]'],
-    ['specialD', '↓ [C]  OU  ↓↙← [C]'], ['throw', '[A]+[B] (PRÈS)'], ['ultimate', 'ULTIME  OU  [B]+[C] (1 BARRE)'], ['ultimate2', '[A]+[B]+[C] (2 BARRES)']
+    ['specialD', '↓ [C]  OU  ↓↙← [C]'], ['specialB', '← [C]'], ['throw', '[A]+[B] (PRÈS)'], ['ultimate', 'ULTIME  OU  [B]+[C] (1 BARRE)'], ['ultimate2', '[A]+[B]+[C] (2 BARRES)']
 ];
 
 export class FightScene implements Scene {
@@ -711,12 +711,18 @@ export class FightScene implements Scene {
         drawText(ctx, `${c.name.toUpperCase()} · LISTE DES COUPS`, 320, 14, { color: '#fff', gradient: COLORS.gold, outline: COLORS.ink, scale: 2, align: 'center' });
         const k = KEYS[0];
         drawText(ctx, `[A] LÉGER = ${keyLabel(k.light[0])}   [B] FORT = ${keyLabel(k.heavy[0])}   [C] SPÉCIAL = ${keyLabel(k.special[0])}`.replace(/\[|\]/g, ''), 320, 36, { color: COLORS.dim, align: 'center' });
-        SLOT_NOTATION.forEach(([slot, input], i) => {
-            const col = i < 9 ? 0 : 1;
-            const row = i < 9 ? i : i - 9;
-            const x = col === 0 ? 24 : 330;
-            const y = 58 + row * 30;
+        // ←S only for the fighters who have a back special.
+        const list = SLOT_NOTATION.flatMap(([slot, input]) => {
             const move = c.moves[slot];
+            return move ? [{ move, input }] : [];
+        });
+        const half = Math.ceil(list.length / 2);
+        const gap = half > 9 ? 28 : 30;
+        list.forEach(({ move, input }, i) => {
+            const col = i < half ? 0 : 1;
+            const row = i < half ? i : i - half;
+            const x = col === 0 ? 24 : 330;
+            const y = 58 + row * gap;
             const kind = move.kind === 'ultimate' ? '#ffd23f' : move.kind === 'special' ? '#9ff3ff' : '#ffffff';
             drawText(ctx, move.name.toUpperCase().slice(0, 44), x, y, { color: kind, outline: COLORS.ink });
             notation(ctx, input, x + 8, y + 12, '#cfc4dc');

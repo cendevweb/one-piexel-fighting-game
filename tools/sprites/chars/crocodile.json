@@ -113,47 +113,6 @@
     267,
     3650
    ]
-  },
-  "cine_cigar": {
-   "rect": [
-    40,
-    4299,
-    216,
-    4379
-   ]
-  },
-  "cine_sun": {
-   "rect": [
-    218,
-    4299,
-    474,
-    4491
-   ]
-  },
-  "cine_desert": {
-   "rect": [
-    476,
-    4299,
-    636,
-    4459
-   ]
-  },
-  "cine_text": {
-   "rect": [
-    641,
-    4315,
-    725,
-    4475
-   ],
-   "key": true
-  },
-  "cine_claws": {
-   "rect": [
-    730,
-    4299,
-    986,
-    4491
-   ]
   }
  },
  "anims": {
@@ -457,7 +416,7 @@
     "6:9"
    ]
   },
-  "ultimate": {
+  "specialB": {
    "frames": [
     "9:0",
     "9:2",
@@ -467,7 +426,7 @@
     "9:6"
    ]
   },
-  "ultimate2": {
+  "ultimate": {
    "frames": [
     "38:0",
     "38:1",
@@ -485,7 +444,14 @@
     "39:0",
     "39:1",
     "39:2",
-    "39:3",
+    "39:3"
+   ]
+  },
+  "ultimate2": {
+   "frames": [
+    "38:0",
+    "38:1",
+    "38:2",
     "39:4",
     "39:5",
     "39:6",
@@ -655,67 +621,5 @@
    ],
    "fps": 15
   }
- },
- "cinematics": {
-  "ultimate2": [
-   {
-    "from": 0,
-    "to": 36,
-    "layout": "full",
-    "image": "cine_sun",
-    "enter": "flash",
-    "sfx": "sand"
-   },
-   {
-    "from": 6,
-    "to": 36,
-    "layout": "fighter",
-    "anim": "win",
-    "scale": 3,
-    "y": 320,
-    "enter": "zoom"
-   },
-   {
-    "from": 34,
-    "to": 66,
-    "layout": "full",
-    "image": "cine_desert",
-    "enter": "slide",
-    "drift": [
-     0.4,
-     0
-    ]
-   },
-   {
-    "from": 40,
-    "to": 66,
-    "layout": "band",
-    "image": "cine_cigar",
-    "scale": 2,
-    "y": 190,
-    "enter": "slide"
-   },
-   {
-    "from": 64,
-    "to": 100,
-    "layout": "full",
-    "image": "cine_claws",
-    "enter": "zoom",
-    "sfx": "slashHeavy"
-   },
-   {
-    "from": 70,
-    "to": 104,
-    "layout": "right",
-    "image": "cine_text",
-    "scale": 2,
-    "enter": "slide"
-   },
-   {
-    "from": 96,
-    "to": 124,
-    "layout": "name"
-   }
-  ]
  }
 }

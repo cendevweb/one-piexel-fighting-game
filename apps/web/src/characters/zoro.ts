@@ -126,7 +126,7 @@ export const zoro: CharacterDef = {
         specialF: {
             name: 'Oni Giri', anim: 'specialF', kind: 'special', stance: 'stand',
             durations: [3, 3, 3, 4, 3, 3, 3, 3, 4, 6, 8],
-            motion: [[4, 6.8, 0], [6, 0, 0]],
+            motion: [[4, 9.6, 0], [6, 0, 0]],
             hits: [{ frames: [4, 6], box: [-8, 4, 56, 50], damage: 96, guard: 'mid', hitstun: 24, blockstun: 14, push: 22, launch: [3.0, 3.6], hitstop: 14, spark: 'blade', shake: 4 }],
             fx: [[6, 'fx_don', 0, 72, 'slashHeavy']],
             sfx: 'iai'
@@ -156,14 +156,14 @@ export const zoro: CharacterDef = {
         },
         ultimate: {
             name: 'Santōryū Ōgi — Sanzen Sekai', anim: 'ultimate', kind: 'ultimate', stance: 'stand',
-            durations: [3, 3, 3, 3, 3, 4, 4, 4, 4, 3, 3, 4, 4, 6, 24, 8, 8, 8, 8],
-            superFreeze: 84, cost: 100, invuln: [0, 13],
-            motion: [[11, 10, 0], [13, 0, 0]],
+            durations: [3, 3, 3, 3, 3, 4, 4, 4, 4, 3, 3, 6, 6, 6, 24, 8, 8, 8, 8],
+            superFreeze: 55, cost: 100, invuln: [0, 13],
+            motion: [[11, 15, 0], [13, 0, 0]],
             passThrough: [11, 13],
             hits: [
                 { frames: [6, 8], box: [0, 0, 46, 64], damage: 30, guard: 'mid', hitstun: 60, blockstun: 20, push: 0, rehit: 4, hitstop: 3, spark: 'cut', shake: 2 },
                 { frames: [11, 12], box: [-30, 0, 76, 70], damage: 50, guard: 'mid', hitstun: 70, blockstun: 20, push: 0, rehit: 4, hitstop: 4, spark: 'blade', shake: 3 },
-                { frames: [14, 14], box: [-130, 0, 134, 100], damage: 260, guard: 'mid', hitstun: 50, blockstun: 22, push: 26, launch: [2.6, 6.2], wallBounce: true, knockdown: true, hitstop: 26, spark: 'big', shake: 10, sfx: 'slashHeavy' }
+                { frames: [14, 14], box: [-200, 0, 204, 100], damage: 260, guard: 'mid', hitstun: 50, blockstun: 22, push: 26, launch: [2.6, 6.2], wallBounce: true, knockdown: true, hitstop: 26, spark: 'big', shake: 10, sfx: 'slashHeavy' }
             ],
             fx: [[5, 'fx_thrust', 20, 36, 'iai'], [13, 'fx_aura', -70, 24], [14, 'fx_gogo', -40, 76, 'menace'], [14, 'fx_burst', -44, 34, 'slashHeavy']],
             sfx: 'iai'
@@ -173,7 +173,7 @@ export const zoro: CharacterDef = {
         ultimate2: {
             name: 'Kyūtōryū Ashura — Ichibugin', anim: 'ultimate2', kind: 'ultimate', stance: 'stand',
             durations: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 6, 9, 5, 5, 4, 8, 10, 8, 8, 10],
-            superFreeze: 120, cost: 200, invuln: [0, 17],
+            superFreeze: 70, cost: 200, invuln: [0, 17],
             motion: [[17, 9.5, 0], [18, 0, 0]],
             passThrough: [17, 18],
             hits: [

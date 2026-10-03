@@ -41,45 +41,11 @@ export interface ManifestAnim {
     behind?: boolean;
 }
 
-/**
- * One layer of an ultimate's cut-in sequence, timed in ticks from the start
- * of the screen freeze. Render only: the engine never reads it.
- *
- * - `full`: the image covers the screen (a background, a close-up).
- * - `band`: the image fills a horizontal band across the middle.
- * - `left` / `right` / `center`: the image stands on that part of the screen.
- * - `name`: the usual band with the move's name and the fighter's cut-in.
- * - `fighter`: the move's sprite (or `anim`) drawn large in the middle, over
- *   the panels below it in the list.
- * `enter` animates the first ticks: a slide from the side, a zoom from
- * large, a white flash. `sfx` plays when the layer appears.
- */
-export interface CinematicPanel {
-    from: number;
-    to: number;
-    layout: 'full' | 'band' | 'left' | 'right' | 'center' | 'name' | 'fighter';
-    image?: string;
-    anim?: string;
-    enter?: 'slide' | 'zoom' | 'flash' | 'none';
-    /** Slow drift in screen pixels per tick, [x, y]. */
-    drift?: [number, number];
-    /** Scale of the image (default: fit the layout). */
-    scale?: number;
-    /** Vertical position of a band or a standing image, in screen pixels. */
-    y?: number;
-    alpha?: number;
-    /** Additive blending (light, flames). */
-    additive?: boolean;
-    sfx?: string;
-}
-
 export interface SpriteManifest {
     id: string;
     image: string;
     anims: Record<string, ManifestAnim>;
     images: Record<string, { src: string; w: number; h: number }>;
-    /** Cut-in sequences of the ultimates, by move slot (render only). */
-    cinematics?: Record<string, CinematicPanel[]>;
 }
 
 // ——— Character data ———
@@ -201,7 +167,8 @@ export interface CharacterDef {
     crouchHeight: number;
     /** Main colour, for the UI and particles. */
     color: string;
-    moves: Record<MoveSlot, MoveDef>;
+    /** `specialB` (←S) is optional: without it, ←S plays `specialN`. */
+    moves: Record<MoveSlot, MoveDef> & { specialB?: MoveDef };
     manifest: SpriteManifest;
 }
 
@@ -213,6 +180,7 @@ export interface CharacterDef {
  *   H, →H, ←H        heavy / heavyFwd / heavyBack directional heavies
  *   air L / H / S    airLight / airHeavy / airSpecial
  *   S                specialN   (or ↓↘→ S)
+ *   ←S               specialB   optional; specialN for those without one
  *   →S               specialF   (or →↓↘ S… see input.ts for the motions)
  *   ↓S               specialD
  *   ↑S               specialU   (or →↓↘ S) — the invincible reversal

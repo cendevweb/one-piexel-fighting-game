@@ -211,10 +211,6 @@ def build(cid: str, src: dict, contact_dir: str | None) -> None:
         img.save(os.path.join(PUBLIC, f"{cid}-{name}.png"), optimize=True)
         manifest["images"][name] = {"src": f"sprites/{cid}-{name}.png", "w": img.width, "h": img.height}
 
-    # Ultimate cut-in sequences (render only), copied as written.
-    if src.get("cinematics"):
-        manifest["cinematics"] = src["cinematics"]
-
     with open(os.path.join(GENERATED, f"{cid}.json"), "w") as f:
         json.dump(manifest, f, separators=(",", ":"))
     print(f"{cid}: {len(anims_out)} anims, {len(order)} frames, atlas {ATLAS_WIDTH}x{packer.height}")

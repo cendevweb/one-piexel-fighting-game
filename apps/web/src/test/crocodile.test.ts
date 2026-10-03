@@ -30,7 +30,8 @@ function step(s: MatchState, a: number, b: number, log: Log) {
     const move = slot && getChar('crocodile').moves[slot as MoveSlot].hits.length ? slot : 'projectile';
     const ev = stepMatch(s, [a, b]);
     for (const e of ev) {
-        if (e.type === 'hit' && e.attacker === 0) log.hits.push(move);
+        // A wall bounce reports a contact without damage: not a hit.
+        if (e.type === 'hit' && e.attacker === 0 && e.damage > 0) log.hits.push(move);
         if (e.type === 'block' && e.attacker === 0) log.blocks++;
         if (e.type === 'combo' && e.side === 0) log.maxCombo = Math.max(log.maxCombo, e.hits);
     }
@@ -142,7 +143,22 @@ describe.each(['luffy', 'akainu'])('Crocodile vs %s', (foe) => {
         expect(s.fighters[1].health).toBeLessThan(hp - 80);
     });
 
-    it('Sables (ultimate): the tornado catches the foe again and again', () => {
+    it('←S: Sables, the sand tornado (specialB), catches the foe several times without meter', () => {
+        const s = fight(foe);
+        pointBlank(s);
+        const hp = s.fighters[1].health;
+        const log = newLog();
+        step(s, BTN.left | special, 0, log);
+        step(s, BTN.left, 0, log);
+        expect(s.fighters[0].move).toBe('specialB');
+        hold(s, 0, 0, 220, log);
+        expect(log.hits.length).toBeGreaterThanOrEqual(3);
+        expect(hp - s.fighters[1].health).toBeGreaterThanOrEqual(80);
+        expect(hp - s.fighters[1].health).toBeLessThan(200);
+        expect(log.events.some((e) => e.type === 'superFreeze')).toBe(false);
+    });
+
+    const pesado = (foe: string) => {
         const s = fight(foe);
         pointBlank(s);
         s.fighters[0].meter = 100;
@@ -151,13 +167,22 @@ describe.each(['luffy', 'akainu'])('Crocodile vs %s', (foe) => {
         step(s, heavy | special, 0, log);
         step(s, 0, 0, log);
         expect(s.fighters[0].move).toBe('ultimate');
-        hold(s, 0, 0, 260, log);
-        expect(log.hits.length).toBeGreaterThanOrEqual(5);
-        expect(hp - s.fighters[1].health).toBeGreaterThanOrEqual(300);
-        expect(hp - s.fighters[1].health).toBeLessThan(400);
+        expect(getChar('crocodile').moves.ultimate.name).toContain('Pesado');
+        hold(s, 0, 0, 300, log);
+        return { log, damage: hp - s.fighters[1].health };
+    };
+
+    it('Sables Pesado (ultimate): the slash, the sphere crushed onto the foe, then its burst', () => {
+        const { log, damage } = pesado(foe);
+        expect(log.hits.filter((m) => m === 'ultimate').length).toBeGreaterThanOrEqual(3);
+        expect(damage).toBeGreaterThanOrEqual(250);
+        expect(damage).toBeLessThan(400);
+        const fx = log.events.filter((e) => e.type === 'fx').map((e) => (e as { anim: string }).anim);
+        expect(fx).toEqual(expect.arrayContaining(['fx_pesado', 'fx_pesadoBreak']));
+        expect(fx).not.toContain('fx_rasparda');
     });
 
-    it('O with two bars: Sables Pesado & Rasparda hits in full at point-blank', () => {
+    it('O with two bars: Desert Rasparda hits in full at point-blank, harder than Pesado', () => {
         const s = fight(foe);
         pointBlank(s);
         s.fighters[0].meter = 200;
@@ -166,16 +191,27 @@ describe.each(['luffy', 'akainu'])('Crocodile vs %s', (foe) => {
         step(s, light | heavy | special, 0, log);
         step(s, 0, 0, log);
         expect(s.fighters[0].move).toBe('ultimate2');
+        expect(getChar('crocodile').moves.ultimate2.name).toContain('Rasparda');
         expect(s.fighters[0].meter).toBe(0);
         hold(s, 0, 0, 360, log);
-        // The somersault slash, the sphere crushing twice, the Rasparda
-        // blades (the wall bounce may report one more, harmless, contact).
-        expect(log.hits.filter((m) => m === 'ultimate2').length).toBeGreaterThanOrEqual(4);
-        expect(log.maxCombo).toBe(4);
-        expect(hp - s.fighters[1].health).toBeGreaterThanOrEqual(400);
-        expect(hp - s.fighters[1].health).toBeLessThanOrEqual(480);
+        expect(log.hits.filter((m) => m === 'ultimate2').length).toBeGreaterThanOrEqual(3);
+        const damage = hp - s.fighters[1].health;
+        expect(damage).toBeGreaterThanOrEqual(400);
+        expect(damage).toBeLessThanOrEqual(480);
+        expect(damage).toBeGreaterThan(pesado(foe).damage);
         const fx = log.events.filter((e) => e.type === 'fx').map((e) => (e as { anim: string }).anim);
-        expect(fx).toEqual(expect.arrayContaining(['fx_pesado', 'fx_pesadoBreak', 'fx_rasparda']));
+        expect(fx).toEqual(expect.arrayContaining(['fx_rasparda', 'fx_column']));
+        expect(fx).not.toContain('fx_pesado');
+    });
+
+    it('Desert Rasparda reaches a foe at mid range', () => {
+        const s = fight(foe);
+        pointBlank(s, 110);
+        s.fighters[0].meter = 200;
+        const log = newLog();
+        step(s, light | heavy | special, 0, log);
+        hold(s, 0, 0, 300, log);
+        expect(log.hits).toContain('ultimate2');
     });
 
     it('O with a single bar does nothing and keeps the gauge', () => {
@@ -192,7 +228,7 @@ describe.each(['luffy', 'akainu'])('Crocodile vs %s', (foe) => {
         expect(s.fighters[1].health).toBe(hp);
     });
 
-    it('heavy → O cancels into Sables Pesado & Rasparda and it all combos', () => {
+    it('heavy → O cancels into Desert Rasparda and it all combos', () => {
         const s = fight(foe);
         pointBlank(s);
         s.fighters[0].meter = 200;
@@ -201,7 +237,7 @@ describe.each(['luffy', 'akainu'])('Crocodile vs %s', (foe) => {
         link(s, heavy, [light | heavy | special], log);
         hold(s, 0, 0, 280, log);
         expect(unique(log.hits)).toEqual(['heavy', 'ultimate2']);
-        expect(log.maxCombo).toBe(5);
+        expect(log.maxCombo).toBeGreaterThanOrEqual(4);
         expect(hp - s.fighters[1].health).toBeGreaterThanOrEqual(400);
     });
 
