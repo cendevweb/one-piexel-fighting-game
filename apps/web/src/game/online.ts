@@ -4,7 +4,8 @@ import { playVoice } from '../audio/voices';
 import { ROSTER } from '../characters';
 import { getChar } from '../engine/registry';
 import { KEYS, keyLabel, type MenuInput } from '../input/devices';
-import { MAX_PACKET_FRAMES, type NetMsg } from '../net/protocol';
+import type { NetMsg } from '../net/protocol';
+import { SpectatorRelay } from '../net/spectator';
 import type { RollbackSession } from '../net/rollback';
 import { CODE_ALPHABET, CODE_LENGTH, codeFromText } from '../net/peer-config';
 import { NET_ERROR_TEXT, NetError, hostRoom, joinRoom, type Link, type Room } from '../net/transport';
@@ -52,11 +53,8 @@ export class OnlineSession {
     ended = false;
     /** Host side: the room's spectator, if one is watching. */
     private spec: Link | null = null;
-    /** Host side: the match being played (null between matches), for the spectator. */
-    private specMatch: { p1: string; p2: string; stage: string; seed: number } | null = null;
-    /** Frames of `specMatch` already sent to the spectator. */
-    private specSent = 0;
-    private specLobby: 'select' | 'stage' | 'results' = 'select';
+    /** Host side: what the spectator is told (net/spectator.ts). */
+    private relay = new SpectatorRelay();
     private unwatch: () => void = () => {};
 
     /** `room`: the host's room, which outlives this session (next guest, spectator). */
@@ -64,10 +62,8 @@ export class OnlineSession {
         if (room) this.unwatch = room.onSpectator((l) => {
             if (this.ended) return;
             this.spec = l;
-            l.onClose(() => { if (this.spec === l) this.spec = null; });
-            // Arriving mid-match: the whole match so far, from frame 0.
-            if (this.specMatch) { l.send({ type: 'start', ...this.specMatch }); this.specSent = 0; }
-            else l.send({ type: 'lobby', what: this.specLobby });
+            l.onClose(() => { if (this.spec === l) { this.spec = null; this.relay.detach(); } });
+            this.relay.attach((m) => l.send(m));
         });
         link.onMessage((m) => {
             this.inbox.push(m);
@@ -108,39 +104,26 @@ export class OnlineSession {
 
     /** Host: the players are between matches, on this screen. */
     watchLobby(what: 'select' | 'stage' | 'results'): void {
-        if (!this.isHost) return;
-        this.specMatch = null;
-        this.specLobby = what;
-        this.spec?.send({ type: 'lobby', what });
+        if (this.isHost) this.relay.lobby(what);
     }
 
     /** Host: a match starts (its `start` was just sent to the guest). */
     watchStart(setup: Setup, seed: number): void {
-        if (!this.isHost) return;
-        this.specMatch = { p1: setup.p1, p2: setup.p2, stage: setup.stage, seed };
-        this.specSent = 0;
-        this.spec?.send({ type: 'start', ...this.specMatch });
+        if (this.isHost) this.relay.start({ p1: setup.p1, p2: setup.p2, stage: setup.stage, seed });
     }
 
     /** Host, every fight tick: the frames confirmed since the last call go to the spectator. */
     watchFrames(seed: number, rb: RollbackSession): void {
-        const spec = this.spec;
-        if (!spec?.open || this.specMatch?.seed !== seed) return;
-        while (this.specSent < rb.confirmedFrame) {
-            const bits = rb.confirmedInputs(this.specSent, this.specSent + MAX_PACKET_FRAMES);
-            if (!bits.length) break;
-            spec.send({ type: 'watch', m: seed, start: this.specSent, bits });
-            this.specSent += bits.length;
-        }
+        this.relay.frames(seed, rb.confirmedFrame, (from, to) => rb.confirmedInputs(from, to));
     }
 
     /** This session is over; the host's room and its spectator stay. */
     private end(): void {
         this.ended = true;
         this.unwatch();
-        if (this.spec?.open) this.spec.send({ type: 'lobby', what: 'waiting' });
+        this.relay.lobby('waiting');
+        this.relay.detach();
         this.spec = null;
-        this.specMatch = null;
     }
 
     /** Closes everything: the guest's link, and the room when hosting. */
