@@ -52,18 +52,6 @@ describe.each(ROSTER.map((c) => [c.id, c] as const))('%s', (_id, def) => {
         }
     });
 
-    it('stages its ultimate cut-in sequences with images and sounds that exist', () => {
-        for (const [slot, panels] of Object.entries(def.manifest.cinematics ?? {})) {
-            expect(def.moves[slot as keyof typeof def.moves]?.superFreeze, `${slot} has a freeze`).toBeGreaterThan(0);
-            for (const p of panels) {
-                if (p.image) expect(def.manifest.images[p.image], `${slot} image ${p.image}`).toBeDefined();
-                if (p.anim) expect(def.manifest.anims[p.anim], `${slot} anim ${p.anim}`).toBeDefined();
-                if (p.sfx) expect(hasSound(p.sfx), `${slot} sfx ${p.sfx}`).toBe(true);
-                expect(p.to, `${slot} panel ends after it starts`).toBeGreaterThan(p.from);
-            }
-        }
-    });
-
     it('has a two-bar second ultimate, stronger than the first', () => {
         const [u1, u2] = [def.moves.ultimate, def.moves.ultimate2];
         expect(u2.kind).toBe('ultimate');

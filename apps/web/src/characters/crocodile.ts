@@ -10,11 +10,10 @@ import type { CharacterDef, SpriteManifest } from '../engine/types';
  * Crescent Cutlass answers jumps with a spiked crescent. His body turns to
  * sand under a blow (←H) and reforms in a burst.
  *
- * Ultimate (1 bar): Sables, a sand tornado that crawls forward and lifts
- * whoever it swallows. Ultimate max (O, 2 bars): Sables Pesado & Rasparda —
- * a compressed sandstorm sphere crushed onto the foe, then the giant sand
- * blades (Rasparda) that burst out of the ground, staged with the cut-in
- * panels of the sheet.
+ * ←S: Sables, a sand tornado that crawls forward and lifts whoever it
+ * swallows. Ultimate (1 bar): Sables Pesado, a compressed sandstorm sphere
+ * crushed onto the foe. Ultimate max (O, 2 bars): Desert Rasparda, giant
+ * sand blades bursting out of the ground.
  *
  * Every `durations` array has exactly one entry per frame of the animation
  * it plays (see tools/sprites/chars/crocodile.json); a test checks it.
@@ -157,41 +156,54 @@ export const crocodile: CharacterDef = {
             },
             sfx: 'sand'
         },
-        ultimate: {
-            // Sables: the cape swirls and a sand tornado crawls forward,
+        specialB: {
+            // Sables (←S): the cape swirls and a sand tornado crawls forward,
             // lifting the foe and hitting again and again.
-            name: 'Sables', anim: 'ultimate', kind: 'ultimate', stance: 'stand',
-            durations: [8, 6, 6, 8, 10, 24],
-            superFreeze: 55, cost: 100, invuln: [0, 4],
+            name: 'Sables', anim: 'specialB', kind: 'special', stance: 'stand',
+            durations: [8, 6, 6, 8, 10, 20],
             fx: [[2, 'fx_tornadoSmall', 40, 0, 'sand']],
             hits: [],
             projectile: {
-                anim: 'fx_sables', atFrame: 3, offset: [24, 0], speed: 1.2, life: 150,
-                box: [-40, 0, 80, 112], fps: 15, hits: 6,
-                hit: { damage: 64, guard: 'mid', hitstun: 30, blockstun: 14, push: 1, launch: [0.2, 3.4], hitstop: 5, spark: 'sand', shake: 4, sfx: 'sand' }
+                anim: 'fx_sables', atFrame: 3, offset: [24, 0], speed: 1.4, life: 110,
+                box: [-40, 0, 80, 112], fps: 15, hits: 3,
+                hit: { damage: 40, guard: 'mid', hitstun: 30, blockstun: 12, push: 1, launch: [0.2, 3.4], hitstop: 5, spark: 'sand', shake: 3, sfx: 'sand' }
             },
             sfx: 'sand'
         },
-        ultimate2: {
-            // Sables Pesado & Rasparda: a somersault slash of the golden
-            // hook, the sandstorm packed into a sphere and crushed onto the
-            // foe, then the giant sand blades bursting out of the ground.
-            name: 'Sables Pesado & Rasparda', anim: 'ultimate2', kind: 'ultimate', stance: 'stand',
-            durations: [4, 4, 4, 3, 3, 4, 3, 3, 5, 6, 6, 6, 4, 6, 4, 4, 4, 4, 4, 4, 4, 6, 10, 8, 12],
-            superFreeze: 120, cost: 200, invuln: [0, 8],
+        ultimate: {
+            // Sables Pesado: a somersault slash of the golden hook, then the
+            // sandstorm packed into a sphere and crushed onto the foe, where
+            // it bursts.
+            name: 'Sables Pesado', anim: 'ultimate', kind: 'ultimate', stance: 'stand',
+            durations: [4, 4, 4, 3, 3, 4, 3, 3, 5, 6, 6, 6, 4, 6, 4, 6, 18],
+            superFreeze: 55, cost: 100, invuln: [0, 8],
             fx: [
                 [12, 'fx_pesado', 60, 46, 'quake'],
                 [15, 'fx_pesadoBreak', 60, 0, 'sand'],
-                [15, 'fx_rocks', 60, 0],
-                [21, 'fx_rasparda', 60, 0, 'sand'],
-                [21, 'fx_column', 124, 0],
-                [22, 'fx_column', 176, 0],
-                [22, 'fx_rocks', 60, 0]
+                [15, 'fx_rocks', 60, 0]
             ],
             hits: [
-                { frames: [4, 5], box: [-4, 0, 66, 76], damage: 70, guard: 'mid', hitstun: 70, blockstun: 22, push: 4, hitstop: 10, spark: 'cut', shake: 4, sfx: 'slashHeavy' },
-                { frames: [13, 16], box: [40, 0, 130, 120], damage: 60, guard: 'mid', hitstun: 70, blockstun: 18, push: 1, rehit: 12, hitstop: 8, spark: 'sand', shake: 8, sfx: 'quake' },
-                { frames: [21, 22], box: [30, 0, 150, 140], damage: 350, guard: 'mid', hitstun: 60, blockstun: 24, push: 30, knockdown: true, launch: [4.6, 7.0], wallBounce: true, hitstop: 24, spark: 'big', shake: 14, sfx: 'sand' }
+                { frames: [4, 5], box: [-4, 0, 66, 76], damage: 60, guard: 'mid', hitstun: 70, blockstun: 22, push: 4, hitstop: 10, spark: 'cut', shake: 4, sfx: 'slashHeavy' },
+                { frames: [12, 14], box: [40, 0, 130, 120], damage: 45, guard: 'mid', hitstun: 60, blockstun: 18, push: 1, rehit: 8, hitstop: 8, spark: 'sand', shake: 8, sfx: 'quake' },
+                { frames: [15, 15], box: [30, 0, 140, 120], damage: 170, guard: 'mid', hitstun: 50, blockstun: 22, push: 26, knockdown: true, launch: [3.2, 6.0], hitstop: 20, spark: 'big', shake: 10, sfx: 'sand' }
+            ],
+            sfx: 'sand'
+        },
+        ultimate2: {
+            // Desert Rasparda: the arm raised, then giant sand blades burst
+            // out of the ground all the way to the foe.
+            name: 'Desert Rasparda', anim: 'ultimate2', kind: 'ultimate', stance: 'stand',
+            durations: [5, 4, 4, 5, 5, 5, 6, 10, 10, 8, 12],
+            superFreeze: 70, cost: 200, invuln: [0, 7],
+            fx: [
+                [7, 'fx_rasparda', 60, 0, 'sand'],
+                [7, 'fx_column', 124, 0],
+                [8, 'fx_column', 176, 0],
+                [8, 'fx_rocks', 60, 0]
+            ],
+            hits: [
+                { frames: [7, 7], box: [30, 0, 170, 140], damage: 70, guard: 'mid', hitstun: 80, blockstun: 20, push: 0, rehit: 3, hitstop: 4, spark: 'sand', shake: 8, sfx: 'quake' },
+                { frames: [8, 8], box: [30, 0, 170, 140], damage: 300, guard: 'mid', hitstun: 60, blockstun: 24, push: 30, knockdown: true, launch: [4.6, 7.0], wallBounce: true, hitstop: 24, spark: 'big', shake: 14, sfx: 'sand' }
             ],
             sfx: 'sand'
         },

@@ -154,6 +154,30 @@ describe('engine', () => {
         expect(s.fighters[0].move).toBe('specialN');
     });
 
+    it('←S is the back special for a fighter who has one, the neutral special otherwise', () => {
+        const s = fight('luffy', 'luffy');
+        hold(s, left, 0, 2);
+        stepMatch(s, [left | special, 0]);
+        expect(getChar('luffy').moves.specialB).toBeUndefined();
+        expect(s.fighters[0].move).toBe('specialN');
+
+        const c = fight('crocodile', 'luffy');
+        hold(c, left, 0, 2);
+        stepMatch(c, [left | special, 0]);
+        expect(c.fighters[0].move).toBe('specialB');
+    });
+
+    it('a special cancel with ← uses the back special only where it exists', () => {
+        for (const [p1, want] of [['luffy', 'specialN'], ['crocodile', 'specialB']] as const) {
+            const s = fight(p1);
+            closeIn(s);
+            stepMatch(s, [heavy, 0]);
+            let t = 0;
+            while (s.fighters[0].move === 'heavy' && t++ < 60) stepMatch(s, [t > 4 && t % 2 ? left | special : left, 0]);
+            expect(s.fighters[0].move).toBe(want);
+        }
+    });
+
     it('a one-tick tap made entirely during hitstop still chains', () => {
         const s = fight();
         closeIn(s);

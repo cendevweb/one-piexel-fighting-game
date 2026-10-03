@@ -95,11 +95,6 @@ export function animBehind(id: string, anim: string): boolean {
     return !!atlases.get(id)?.manifest.anims[anim]?.behind;
 }
 
-/** The manifest of a loaded atlas. */
-export function manifestOf(id: string): SpriteManifest | undefined {
-    return atlases.get(id)?.manifest;
-}
-
 export function hasAnim(id: string, anim: string): boolean {
     return !!atlases.get(id)?.manifest.anims[anim];
 }

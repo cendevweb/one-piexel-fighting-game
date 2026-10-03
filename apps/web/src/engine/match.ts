@@ -111,7 +111,7 @@ function resetRound(state: MatchState): void {
 
 // ——— Animation helpers ———
 
-const moveOf = (f: FighterState): MoveDef | null => (f.move ? getChar(f.char).moves[f.move as keyof CharacterDef['moves']] : null);
+const moveOf = (f: FighterState): MoveDef | null => (f.move ? getChar(f.char).moves[f.move as keyof CharacterDef['moves']] ?? null : null);
 
 function setAnim(f: FighterState, anim: string, frame = 0): void {
     if (f.anim === anim && frame === 0 && f.frame !== 0 && anim !== 'hit' && anim !== 'hitHeavy') return;
@@ -246,7 +246,13 @@ function specialSlot(f: FighterState): string | null {
     if (d === 7 || d === 8 || d === 9) return 'specialU';
     if (d === 6 || d === 3) return 'specialF';
     if (d === 1 || d === 2) return 'specialD';
+    if (d === 4) return 'specialB';
     return 'specialN';
+}
+
+/** ←S plays the back special where the fighter has one, else the neutral one. */
+function backFallback(slot: string | null, has: (slot: string) => boolean): string | null {
+    return slot === 'specialB' && !has('specialB') ? 'specialN' : slot;
 }
 
 function normalSlot(f: FighterState, air: boolean): string | null {
@@ -313,7 +319,7 @@ function intentOf(state: MatchState, f: FighterState): string | null {
         return normalSlot(f, true);
     }
     if (wantsThrow(f)) return 'throw';
-    const sp = specialSlot(f);
+    const sp = backFallback(specialSlot(f), has);
     if (sp && has(sp)) return sp;
     return normalSlot(f, false);
 }
@@ -349,8 +355,8 @@ function cancelInto(f: FighterState, move: MoveDef, want: string): string | null
     }
     if (isSpecialSlot(want)) {
         if (!move.cancelable || f.airActions >= 2) return null;
-        const slot = f.y > 0 ? 'airSpecial' : want === 'airSpecial' ? 'specialN' : want;
-        return has(slot) ? slot : null;
+        const slot = f.y > 0 ? 'airSpecial' : want === 'airSpecial' ? 'specialN' : backFallback(want, has);
+        return slot && has(slot) ? slot : null;
     }
     if (!move.chain) return null;
     if (move.chain.includes(want)) return want;

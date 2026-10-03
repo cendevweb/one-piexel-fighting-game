@@ -2,10 +2,10 @@ import { play } from '../audio/sound';
 import { playVoice } from '../audio/voices';
 import { METER_MAX, ULTIMATE_COST, GUARD_MAX, activeHitBoxes, hurtBoxes, ultimateUsable } from '../engine/match';
 import { getChar } from '../engine/registry';
-import { PX, type CinematicPanel, type FighterState, type GameEvent, type MatchState, type Rect } from '../engine/types';
+import { PX, type FighterState, type GameEvent, type MatchState, type Rect } from '../engine/types';
 import { settings } from '../settings';
 import { drawText, textWidth } from './font';
-import { artOf, drawFrame, frameOf, hasAnim, animAlpha, animBehind, animPer, manifestOf, type Tint } from './sprites';
+import { artOf, drawFrame, frameOf, hasAnim, animAlpha, animBehind, animPer, type Tint } from './sprites';
 import { GROUND_Y, StageRenderer, type StageDef } from './stage';
 import { Vfx } from './vfx';
 
@@ -241,14 +241,8 @@ export class FightView {
             }
         }
         if (this.cutin) {
-            const c = this.cutin;
-            c.t++;
-            const panels = this.cinematic(c.char, c.slot);
-            // A staged sequence plays its sounds as its layers appear, and
-            // may outlast the freeze; the plain band fades out after it.
-            for (const p of panels ?? []) if (p.sfx && p.from === c.t) play(p.sfx);
-            const end = panels ? Math.max(0, ...panels.map((p) => p.to)) : 20;
-            if (!s.freeze && c.t > end && (panels || c.t > 20)) this.cutin = null;
+            this.cutin.t++;
+            if (!s.freeze && this.cutin.t > 20) this.cutin = null;
         }
         for (const b of this.banners) b.t++;
         this.banners = this.banners.filter((b) => b.t < b.dur);
@@ -397,104 +391,11 @@ export class FightView {
         ctx.globalAlpha = 1;
     }
 
-    private cinematic(char: string, slot: string): CinematicPanel[] | undefined {
-        return manifestOf(char)?.cinematics?.[slot];
-    }
-
     private drawCutin(ctx: CanvasRenderingContext2D): void {
-        const c = this.cutin!;
-        const panels = this.cinematic(c.char, c.slot);
-        if (panels) this.drawCinematic(ctx, panels);
-        else this.drawNameBand(ctx, c.t);
-    }
-
-    /**
-     * An ultimate staged as a sequence of layers (see CinematicPanel): each
-     * is drawn while the cut-in clock is inside its window, in list order.
-     */
-    private drawCinematic(ctx: CanvasRenderingContext2D, panels: CinematicPanel[]): void {
-        const c = this.cutin!;
-        const dir = c.side === 0 ? 1 : -1;
-        for (const p of panels) {
-            if (c.t < p.from || c.t >= p.to) continue;
-            const lt = c.t - p.from;
-            const left = p.to - c.t;
-            const fade = Math.min(1, left / 4);
-            const enter = Math.min(1, lt / 8);
-            ctx.save();
-            ctx.globalAlpha = (p.alpha ?? 1) * fade;
-            if (p.additive) ctx.globalCompositeOperation = 'lighter';
-            const [dx, dy] = p.drift ?? [0, 0];
-            let ox = dx * lt * dir;
-            const oy = dy * lt;
-            let zoom = 1;
-            if (p.enter === 'slide') ox += (1 - (1 - Math.pow(1 - enter, 3))) * -360 * dir;
-            if (p.enter === 'zoom') zoom = 1 + 0.6 * Math.pow(1 - enter, 2);
-            if (p.layout === 'name') {
-                ctx.restore();
-                this.drawNameBand(ctx, lt);
-                continue;
-            }
-            if (p.layout === 'fighter') {
-                const f = this.state.fighters[c.side];
-                const anim = p.anim ?? f.anim;
-                const n = manifestOf(f.char)?.anims[anim]?.frames.length ?? 1;
-                const per = animPer(f.char, anim, 6);
-                const frame = p.anim ? Math.min(n - 1, Math.floor(lt / per)) : f.frame;
-                const sc = (p.scale ?? 3) * zoom;
-                ctx.translate(320 + ox, (p.y ?? 300) + oy);
-                ctx.scale(sc, sc);
-                drawFrame(ctx, f.char, anim, frame, 0, 0, dir as 1 | -1);
-                ctx.restore();
-                continue;
-            }
-            const img = p.image ? artOf(c.char, p.image) : undefined;
-            if (img) {
-                let w: number;
-                let h: number;
-                let x: number;
-                let y: number;
-                if (p.layout === 'full') {
-                    const sc = (p.scale ?? Math.max(640 / img.width, 360 / img.height)) * zoom;
-                    w = img.width * sc;
-                    h = img.height * sc;
-                    x = 320 - w / 2 + ox;
-                    y = 180 - h / 2 + oy;
-                } else if (p.layout === 'band') {
-                    const sc = (p.scale ?? 640 / img.width) * zoom;
-                    w = img.width * sc;
-                    h = img.height * sc;
-                    const cy = p.y ?? 180;
-                    ctx.fillStyle = 'rgba(0,0,0,0.8)';
-                    ctx.fillRect(0, cy - h / 2 - 4, 640, h + 8);
-                    x = 320 - w / 2 + ox;
-                    y = cy - h / 2 + oy;
-                } else {
-                    const sc = (p.scale ?? Math.min(2, 300 / img.height)) * zoom;
-                    w = img.width * sc;
-                    h = img.height * sc;
-                    // left / right follow the side of the fighter who struck.
-                    const side = p.layout === 'center' ? 0 : (p.layout === 'left' ? -1 : 1) * dir;
-                    x = side === 0 ? 320 - w / 2 : side < 0 ? 24 : 616 - w;
-                    x += ox;
-                    y = (p.y ?? 180) - h / 2 + oy;
-                }
-                ctx.drawImage(img, Math.round(x), Math.round(y), Math.round(w), Math.round(h));
-            }
-            if (p.enter === 'flash' && lt < 8) {
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.globalAlpha = 1 - lt / 8;
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, 640, 360);
-            }
-            ctx.restore();
-        }
-    }
-
-    private drawNameBand(ctx: CanvasRenderingContext2D, t: number): void {
         const c = this.cutin!;
         const art = artOf(c.char, 'cutin');
         const def = getChar(c.char);
+        const t = c.t;
         const slide = Math.min(1, t / 10);
         const out = this.state.freeze ? 0 : Math.min(1, t / 20);
         const bandH = 96;
