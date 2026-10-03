@@ -43,7 +43,9 @@ const stageBackdrop = () => (STAGES.some((s) => s.id === ONLINE_BACKDROP) ? ONLI
 /**
  * One connected pair of browsers. Messages are queued in `inbox` and each
  * scene drains them in its tick, so nothing is lost while scenes fade into
- * each other. Losing the peer at any point ends on a notice screen.
+ * each other. The room lives as long as its host: when the guest leaves, at
+ * any point, the host goes back to the room's waiting screen, same code,
+ * for the next guest. When the host leaves, the guest gets a notice.
  */
 export class OnlineSession {
     inbox: NetMsg[] = [];
@@ -55,14 +57,14 @@ export class OnlineSession {
     /** Frames of `specMatch` already sent to the spectator. */
     private specSent = 0;
     private specLobby: 'select' | 'stage' | 'results' = 'select';
+    private unwatch: () => void = () => {};
 
-    /** `room`: the host's room, where a spectator may join. */
-    constructor(readonly app: App, readonly link: Link, readonly code: string, room?: Room) {
-        room?.onSpectator((l) => {
+    /** `room`: the host's room, which outlives this session (next guest, spectator). */
+    constructor(readonly app: App, readonly link: Link, readonly code: string, private room?: Room) {
+        if (room) this.unwatch = room.onSpectator((l) => {
+            if (this.ended) return;
             this.spec = l;
             l.onClose(() => { if (this.spec === l) this.spec = null; });
-            if (this.ended) { l.close(); return; }
-            play('uiMove');
             // Arriving mid-match: the whole match so far, from frame 0.
             if (this.specMatch) { l.send({ type: 'start', ...this.specMatch }); this.specSent = 0; }
             else l.send({ type: 'lobby', what: this.specLobby });
@@ -74,10 +76,12 @@ export class OnlineSession {
         });
         link.onClose((reason) => {
             if (reason === 'local' || this.ended) return;
-            this.ended = true;
-            this.spec?.close();
+            this.end();
             play('uiBack');
-            app.go(new NetNoticeScene(app, 'CONNEXION PERDUE', NET_ERROR_TEXT[reason === 'left' ? 'left' : 'peerGone']));
+            const text = NET_ERROR_TEXT[reason === 'left' ? 'left' : 'peerGone'];
+            // Host: the room stays open, back to waiting for a guest.
+            if (room?.open) app.go(new HostScene(app, room, text));
+            else app.go(new NetNoticeScene(app, 'CONNEXION PERDUE', text, () => new VersusMenuScene(app, new MainMenuScene(app))));
         });
     }
 
@@ -130,12 +134,26 @@ export class OnlineSession {
         }
     }
 
+    /** This session is over; the host's room and its spectator stay. */
+    private end(): void {
+        this.ended = true;
+        this.unwatch();
+        if (this.spec?.open) this.spec.send({ type: 'lobby', what: 'waiting' });
+        this.spec = null;
+        this.specMatch = null;
+    }
+
+    /** Closes everything: the guest's link, and the room when hosting. */
+    private closeAll(): void {
+        this.end();
+        if (this.room) this.room.close();
+        else this.link.close();
+    }
+
     /** Ends the session on a notice (something the two games disagree on). */
     fail(message: string): void {
         if (this.ended) return;
-        this.ended = true;
-        this.spec?.close();
-        this.link.close();
+        this.closeAll();
         this.app.go(new NetNoticeScene(this.app, 'PARTIE INTERROMPUE', message));
     }
 
@@ -152,9 +170,7 @@ export class OnlineSession {
 
     /** Leave on purpose: tell the other side, back to the main menu. */
     quit(): void {
-        this.ended = true;
-        this.spec?.close();
-        this.link.close();
+        this.closeAll();
         this.app.go(new MainMenuScene(this.app));
     }
 }
@@ -344,29 +360,22 @@ export class HostScene implements Scene {
     private refused = '';
     private refusedAt = 0;
     private gone = false;
+    private watcher: Link | null = null;
+    private unsub: (() => void)[] = [];
 
-    constructor(private app: App) {}
+    /**
+     * `room`: back to an open room after its guest left (`notice` says why);
+     * else a new room is created.
+     */
+    constructor(private app: App, private reopen?: Room, private notice = '') {}
 
     enter(): void {
         startMusic('select');
+        if (this.reopen) { this.listen(this.reopen); return; }
         hostRoom().then((room) => {
             if (this.gone) { room.close(); return; }
-            this.room = room;
-            void this.copy();
-            room.onRefused((kind) => {
-                this.refused = kind === 'full' ? 'UN SECOND JOUEUR A ÉTÉ REFUSÉ'
-                    : kind === 'specFull' ? 'UN SECOND SPECTATEUR A ÉTÉ REFUSÉ' : 'UN JOUEUR A ÉTÉ REFUSÉ : VERSION DIFFÉRENTE';
-                this.refusedAt = this.t;
-            });
-            room.waitForGuest().then((link) => {
-                if (this.gone) return;
-                this.gone = true;
-                play('uiSelect');
-                const session = new OnlineSession(this.app, link, room.code, room);
-                this.app.go(new OnlineSelectScene(session));
-            }, (err: unknown) => {
-                if (!this.gone) this.error = err instanceof NetError ? NET_ERROR_TEXT[err.kind] : 'LE SALON A ÉTÉ FERMÉ';
-            });
+            void this.copy(room);
+            this.listen(room);
         }, (err: unknown) => {
             if (this.gone) return;
             this.error = err instanceof NetError ? NET_ERROR_TEXT[err.kind] : NET_ERROR_TEXT.broker;
@@ -374,12 +383,39 @@ export class HostScene implements Scene {
         });
     }
 
+    private listen(room: Room): void {
+        this.room = room;
+        room.onRefused((kind) => {
+            if (this.gone) return;
+            this.refused = kind === 'full' ? 'UN SECOND JOUEUR A ÉTÉ REFUSÉ'
+                : kind === 'specFull' ? 'UN SECOND SPECTATEUR A ÉTÉ REFUSÉ' : 'UN JOUEUR A ÉTÉ REFUSÉ : VERSION DIFFÉRENTE';
+            this.refusedAt = this.t;
+        });
+        this.unsub.push(room.onSpectator((l) => { this.watcher = l; }));
+        this.unsub.push(room.onError((err) => {
+            if (!this.gone) this.error = err instanceof NetError ? NET_ERROR_TEXT[err.kind] : 'LE SALON A ÉTÉ FERMÉ';
+        }));
+        this.unsub.push(room.onGuest((link) => {
+            if (this.gone) return;
+            this.leave();
+            play('uiSelect');
+            this.app.go(new OnlineSelectScene(new OnlineSession(this.app, link, room.code, room)));
+        }));
+    }
+
+    private leave(): void {
+        this.gone = true;
+        for (const u of this.unsub) u();
+        this.unsub = [];
+    }
+
     private copiedWhat: 'invite' | 'watch' = 'invite';
 
-    private async copy(what: 'invite' | 'watch' = 'invite'): Promise<void> {
-        if (!this.room) return;
+    private async copy(room = this.room, what: 'invite' | 'watch' = 'invite'): Promise<void> {
+        if (!room) return;
         this.copiedWhat = what;
-        this.copied = (await copyText(what === 'watch' ? this.room.watchUrl : this.room.url)) ? 'yes' : 'failed';
+        this.notice = '';
+        this.copied = (await copyText(what === 'watch' ? room.watchUrl : room.url)) ? 'yes' : 'failed';
         this.copiedAt = this.t;
     }
 
@@ -389,19 +425,19 @@ export class HostScene implements Scene {
         for (const m of menu) {
             if (m.action === 'back') {
                 play('uiBack');
-                this.gone = true;
+                this.leave();
                 this.room?.close();
                 this.app.go(new VersusMenuScene(this.app, new MainMenuScene(this.app)));
                 return;
             }
             if (m.action === 'confirm' && this.error) {
                 play('uiConfirm');
-                this.gone = true;
+                this.leave();
                 this.app.go(new HostScene(this.app));
                 return;
             }
             if ((m.action === 'confirm' || m.action === 'right') && this.room) { play('uiConfirm'); void this.copy(); }
-            if (m.action === 'left' && this.room) { play('uiConfirm'); void this.copy('watch'); }
+            if (m.action === 'left' && this.room) { play('uiConfirm'); void this.copy(this.room, 'watch'); }
         }
     }
 
@@ -432,6 +468,8 @@ export class HostScene implements Scene {
         const flash = this.t - this.copiedAt < 150;
         if (this.copied === 'yes' && flash) drawText(ctx, this.copiedWhat === 'watch' ? 'LIEN SPECTATEUR COPIÉ !' : 'LIEN COPIÉ DANS LE PRESSE-PAPIERS !', 320, 188, { color: '#9dff7a', outline: COLORS.ink, align: 'center' });
         if (this.copied === 'failed' && flash) drawText(ctx, 'COPIE IMPOSSIBLE : RECOPIEZ LE LIEN OU LE CODE.', 320, 188, { color: COLORS.red, outline: COLORS.ink, align: 'center' });
+        if (this.notice) drawText(ctx, `${this.notice} · LE SALON RESTE OUVERT`, 320, 188, { color: COLORS.gold, outline: COLORS.ink, align: 'center' });
+        if (this.watcher?.open) drawText(ctx, '1 SPECTATEUR', 632, 6, { color: COLORS.blue, outline: COLORS.ink, align: 'right' });
 
         panel(ctx, 120, 210, 400, 84, COLORS.dim);
         const dots = '.'.repeat(1 + ((this.t >> 4) % 3));

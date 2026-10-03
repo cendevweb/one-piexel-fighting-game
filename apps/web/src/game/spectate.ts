@@ -40,7 +40,7 @@ const END_DELAY = 150;
 /** Out of frames for this long: say we are waiting. */
 const STALL_NOTICE = 30;
 
-export type LobbyWhat = 'select' | 'stage' | 'results' | 'none';
+export type LobbyWhat = 'select' | 'stage' | 'results' | 'waiting' | 'none';
 
 /** The spectator's link to the host's room. */
 export class SpectatorSession {
@@ -135,7 +135,8 @@ const LOBBY_TEXT: Record<LobbyWhat, string> = {
     none: 'EN ATTENTE DES JOUEURS',
     select: 'LES JOUEURS CHOISISSENT LEURS PERSONNAGES',
     stage: 'L\'HÔTE CHOISIT L\'ARÈNE',
-    results: 'LES JOUEURS DÉCIDENT DE LA SUITE'
+    results: 'LES JOUEURS DÉCIDENT DE LA SUITE',
+    waiting: 'L\'ADVERSAIRE EST PARTI : L\'HÔTE EN ATTEND UN AUTRE'
 };
 
 // ——— Between matches ———
@@ -244,6 +245,7 @@ export class SpectateFightScene implements Scene {
         endInputTick();
         if (this.done || this.session.ended) return;
         this.receive();
+        if (this.done) return;
         if (this.leave.handle(menu)) { this.done = true; this.session.quit(); return; }
 
         // Far behind: jump ahead without effects, then play normally.
@@ -286,6 +288,13 @@ export class SpectateFightScene implements Scene {
                 const skip = this.inputs.length - msg.start;
                 if (skip < 0) { console.warn(`[spectateur] trou dans les frames (${this.inputs.length} → ${msg.start})`); continue; }
                 for (let i = skip; i < msg.bits.length; i++) this.inputs.push(msg.bits[i]);
+            } else if (msg.type === 'lobby' && msg.what === 'waiting' && this.state.phase !== 'matchEnd') {
+                // The guest left mid-match: the match will never end.
+                this.done = true;
+                this.session.lastResult = 'COMBAT INTERROMPU';
+                this.session.putBack(inbox.slice(n + 1));
+                this.session.app.go(new SpectateWaitScene(this.session));
+                return;
             } else if (msg.type === 'start') {
                 // The players are already on their next match: finish this one first.
                 this.nextQueued = true;

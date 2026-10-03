@@ -80,18 +80,25 @@ export interface Room {
     url: string;
     /** The spectator's link: ?spectateur=CODE. */
     watchUrl: string;
-    /** Resolves with the first guest that passes the hello; rejects if the room dies. */
-    waitForGuest(): Promise<Link>;
-    onGuest(cb: (link: Link) => void): void;
+    /** False once closed (by the host, or the broker died with nobody in it). */
+    readonly open: boolean;
+    /**
+     * Every guest that passes the hello, one at a time: after a guest leaves,
+     * the room takes the next. A guest that came while nobody listened is
+     * handed to the next listener. Returns the unsubscribe.
+     */
+    onGuest(cb: (link: Link) => void): () => void;
+    /** The broker died while nobody was playing: the room is gone. */
+    onError(cb: (err: Error) => void): () => void;
     /** A visitor was turned away (other version, room already full). */
     onRefused(cb: (kind: NetErrorKind) => void): void;
     /**
      * A spectator joined (at most one at a time, before or after the guest).
      * Its link shares the room's connection to the broker: closing it leaves
-     * the guest alone.
+     * the guest alone. Returns the unsubscribe.
      */
-    onSpectator(cb: (link: Link) => void): void;
-    /** Abandons the room (before or after a guest joined). */
+    onSpectator(cb: (link: Link) => void): () => void;
+    /** Abandons the room (before or after a guest joined): everyone is told. */
     close(): void;
 }
 
@@ -210,7 +217,7 @@ class PeerLink implements Link {
     private onUnload = () => this.close(true);
     private sim = typeof location === 'undefined' ? null : netSimFrom(location.search);
 
-    /** `ownsPeer`: false for the host's spectator link, which shares the room's Peer with the guest's. */
+    /** `ownsPeer`: false for the host's links (guest, spectator), which share the room's Peer. */
     constructor(readonly side: 0 | 1, private peer: Peer, private conn: DataConnection, private ownsPeer = true) {
         conn.on('data', (d) => this.receive(d));
         conn.on('close', () => this.shut('peerGone'));
@@ -227,7 +234,8 @@ class PeerLink implements Link {
             console.warn('Canal rapide indisponible, tout passe par le canal fiable.', e);
         }
         // The broker is only needed to meet; errors on it no longer matter.
-        peer.on('error', (err) => console.warn('PeerJS :', err.type));
+        // (The host's room watches its own Peer.)
+        if (ownsPeer) peer.on('error', (err) => console.warn('PeerJS :', err.type));
         this.timer = setInterval(() => this.heartbeat(), PING_EVERY);
         window.addEventListener('pagehide', this.onUnload);
     }
@@ -344,16 +352,18 @@ export async function hostRoom(): Promise<Room> {
         }
     }
     const p = peer;
+    /** The guest playing now; null while the host waits for one. */
     let link: PeerLink | null = null;
+    /** A guest no listener has taken yet (it joined during a scene change). */
+    let pending: PeerLink | null = null;
     let spectator: PeerLink | null = null;
     let closed = false;
-    const guestCbs: ((l: Link) => void)[] = [];
-    const spectatorCbs: ((l: Link) => void)[] = [];
+    let failure: Error | null = null;
+    let guestCbs: ((l: Link) => void)[] = [];
+    let spectatorCbs: ((l: Link) => void)[] = [];
+    let errorCbs: ((e: Error) => void)[] = [];
     const refusedCbs: ((k: NetErrorKind) => void)[] = [];
-    let resolveGuest!: (l: Link) => void;
-    let rejectGuest!: (e: Error) => void;
-    const guest = new Promise<Link>((res, rej) => { resolveGuest = res; rejectGuest = rej; });
-    guest.catch(() => { /* surfaced to whoever awaits it */ });
+    const off = <T>(list: () => T[], set: (v: T[]) => void, cb: T) => () => set(list().filter((c) => c !== cb));
 
     const refuse = (conn: DataConnection, reason: 'version' | 'full' | 'specFull') => {
         conn.send(encode({ type: 'helloAck', v: PROTOCOL_VERSION, ok: false, reason }));
@@ -367,24 +377,28 @@ export async function hostRoom(): Promise<Room> {
             const msg = typeof data === 'string' ? decode(data) : null;
             if (!msg || msg.type !== 'hello') return;
             conn.off('data', onData);
-            if (msg.spec ? spectator?.open : link) { refuse(conn, msg.spec ? 'specFull' : 'full'); return; }
+            if (msg.spec ? spectator?.open : link?.open) { refuse(conn, msg.spec ? 'specFull' : 'full'); return; }
             if (msg.v !== PROTOCOL_VERSION || msg.b !== buildFingerprint()) { refuse(conn, 'version'); return; }
+            conn.send(encode({ type: 'helloAck', v: PROTOCOL_VERSION, ok: true }));
+            // Both links share the room's Peer: either may go, the room stays.
+            const l = new PeerLink(0, p, conn, false);
             if (msg.spec) {
-                conn.send(encode({ type: 'helloAck', v: PROTOCOL_VERSION, ok: true }));
-                const s = new PeerLink(0, p, conn, false);
-                spectator = s;
-                s.onClose(() => { if (spectator === s) spectator = null; });
-                for (const cb of spectatorCbs) cb(s);
+                spectator = l;
+                l.onClose(() => { if (spectator === l) spectator = null; });
+                for (const cb of [...spectatorCbs]) cb(l);
                 return;
             }
-            conn.send(encode({ type: 'helloAck', v: PROTOCOL_VERSION, ok: true }));
-            link = new PeerLink(0, p, conn);
-            resolveGuest(link);
-            for (const cb of guestCbs) cb(link);
+            link = l;
+            l.onClose(() => {
+                if (link === l) link = null;
+                if (pending === l) pending = null;
+            });
+            if (guestCbs.length) for (const cb of [...guestCbs]) cb(l);
+            else pending = l;
         };
         conn.on('data', onData);
     });
-    // Stay on the broker as long as the room is open: after the guest, a
+    // Stay on the broker as long as the room is open: another guest or a
     // spectator may still come.
     p.on('disconnected', () => {
         if (closed) return;
@@ -394,8 +408,10 @@ export async function hostRoom(): Promise<Room> {
         if (link || closed) return;
         if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'socket-closed') {
             closed = true;
+            spectator?.close();
             p.destroy();
-            rejectGuest(new NetError('broker', err.type));
+            failure = new NetError('broker', err.type);
+            for (const cb of [...errorCbs]) cb(failure);
         }
     });
 
@@ -405,17 +421,30 @@ export async function hostRoom(): Promise<Room> {
         code,
         url: inviteUrl(code, location, cfg.debugPeer, publicUrl),
         watchUrl: inviteUrl(code, location, cfg.debugPeer, publicUrl, 'spectateur'),
-        waitForGuest: () => guest,
-        onGuest: (cb) => { guestCbs.push(cb); if (link) cb(link); },
+        get open() { return !closed; },
+        onGuest: (cb) => {
+            guestCbs.push(cb);
+            if (pending?.open) { const l = pending; pending = null; cb(l); }
+            return off(() => guestCbs, (v) => { guestCbs = v; }, cb);
+        },
+        onError: (cb) => {
+            errorCbs.push(cb);
+            if (failure) cb(failure);
+            return off(() => errorCbs, (v) => { errorCbs = v; }, cb);
+        },
         onRefused: (cb) => { refusedCbs.push(cb); },
-        onSpectator: (cb) => { spectatorCbs.push(cb); if (spectator?.open) cb(spectator); },
+        onSpectator: (cb) => {
+            spectatorCbs.push(cb);
+            if (spectator?.open) cb(spectator);
+            return off(() => spectatorCbs, (v) => { spectatorCbs = v; }, cb);
+        },
         close: () => {
             if (closed) return;
             closed = true;
             spectator?.close();
-            if (link) link.close();
-            else p.destroy();
-            rejectGuest(new Error('salon fermé'));
+            link?.close();
+            // The goodbyes leave first (PeerLink.close waits 300 ms).
+            setTimeout(() => p.destroy(), 400);
         }
     };
 }

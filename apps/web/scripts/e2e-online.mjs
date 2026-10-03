@@ -6,7 +6,9 @@
 //      network (?netlag / ?netjitter / ?netloss on both pages);
 //   2. a rematch, the guest now typing on the keyboard (walk, jump, chains,
 //      specials, throw, ultimate) for about 30 s;
-//   3. the host closes its tab: the guest must show "ADVERSAIRE DÉCONNECTÉ".
+//   3. the guest closes its tab: the host is back in its room (same code),
+//      a new guest joins, quits from the select, joins again;
+//   4. the host closes its tab: the guest must show "ADVERSAIRE DÉCONNECTÉ".
 // A spectator (?spectateur=CODE) arrives before the guest and watches match 1; a second
 // one is turned away; during match 2 the first leaves and another arrives
 // mid-match and must catch up. Each replays the same inputs as the players.
@@ -242,18 +244,39 @@ try {
         await B.tap('Escape', 200);
     }
 
-    // 3. The host closes its tab.
+    // 3. The guest closes its tab mid-match: the host goes back to its room,
+    //    same code, and the spectator waits with it. A new guest joins.
+    await B.ctx.close();
+    await A.waitScene('HostScene', 10000);
+    await E.waitScene('SpectateWaitScene', 10000);
+    await A.p.waitForTimeout(600);
+    await A.shot('09-salon-rouvert'); await E.shot('09-attente');
+    check(true, 'invité parti : l\'hôte revient à son salon, le spectateur attend');
+    const F = await page('invite2');
+    await F.p.goto(invite);
+    await Promise.all([A.waitScene('OnlineSelectScene'), F.waitScene('OnlineSelectScene')]);
+    check(true, 'un nouvel invité rejoint le même salon');
+    // The new guest quits from the select: the room is still open.
+    await F.p.waitForTimeout(600);
+    await F.tap('Escape', 300); await F.tap('KeyS', 200); await F.tap('KeyJ', 300);
+    await A.waitScene('HostScene', 10000);
+    await F.waitScene('MainMenuScene', 10000);
+    check(true, 'invité qui quitte la sélection : le salon reste ouvert');
+    await F.p.goto(invite);
+    await Promise.all([A.waitScene('OnlineSelectScene'), F.waitScene('OnlineSelectScene')]);
+
+    // 4. The host closes its tab.
     await A.ctx.close();
-    await B.waitScene('NetNoticeScene', 10000);
-    await B.p.waitForTimeout(600);
-    await B.shot('09-deconnecte');
+    await F.waitScene('NetNoticeScene', 10000);
+    await F.p.waitForTimeout(600);
+    await F.shot('10-deconnecte');
     await E.waitScene('NetNoticeScene', 10000);
-    await E.shot('09-fin-diffusion');
+    await E.shot('10-fin-diffusion');
     check(true, 'spectateur : fin de diffusion affichée');
-    const text = await B.p.evaluate(() => document.body.innerText);
-    void text;
-    check(true, 'invité : écran de déconnexion affiché');
-    const errs = [...A.errors, ...B.errors, ...C.errors, ...E.errors].filter((e) => !/PeerJS|Failed to load resource|ERR_|WebSocket/i.test(e));
+    await F.tap('Enter', 600);
+    await F.waitScene('VersusMenuScene', 5000);
+    check(true, 'invité : écran de déconnexion, puis menu VERSUS');
+    const errs = [...A.errors, ...B.errors, ...C.errors, ...E.errors, ...F.errors].filter((e) => !/PeerJS|Failed to load resource|ERR_|WebSocket/i.test(e));
     check(errs.length === 0, `aucune erreur de page ${errs.length ? JSON.stringify(errs.slice(0, 5)) : ''}`);
 } catch (e) {
     failures++;
