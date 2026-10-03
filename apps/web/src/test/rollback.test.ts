@@ -3,7 +3,7 @@ import '../characters';
 import { createMatch, stepMatch } from '../engine/match';
 import { BTN, type MatchState } from '../engine/types';
 import { checksum, cloneState } from '../net/checksum';
-import { decode, encode, PROTOCOL_VERSION, type NetMsg } from '../net/protocol';
+import { decode, encode, packPair, PROTOCOL_VERSION, unpackPair, type NetMsg } from '../net/protocol';
 import { RollbackSession, type RollbackOptions } from '../net/rollback';
 
 const { up, down, left, right, light, heavy, special } = BTN;
@@ -165,7 +165,11 @@ describe('protocol', () => {
             { type: 'checksum', frame: 60, sum: 0xdeadbeef },
             { type: 'ping', t: 1234.5 },
             { type: 'reselect', m: 123456 },
-            { type: 'leave' }
+            { type: 'leave' },
+            { type: 'hello', v: PROTOCOL_VERSION, name: 'SPECTATEUR', b: 7, spec: true },
+            { type: 'helloAck', v: PROTOCOL_VERSION, ok: false, reason: 'specFull' },
+            { type: 'watch', m: 42, start: 128, bits: [0, packPair(0x1ff, 0x1ff), packPair(16, 3)] },
+            { type: 'lobby', what: 'results' }
         ];
         for (const m of msgs) expect(decode(encode(m))).toEqual(m);
         expect(decode('not json')).toBeNull();
@@ -183,6 +187,13 @@ describe('protocol', () => {
         expect(decode('{"type":"reselect"}')).toBeNull();
         expect(decode('{"type":"reselect","m":-1}')).toBeNull();
         expect(decode('{"type":"leave","extra":"x"}')).toEqual({ type: 'leave' });
+        expect(decode('{"type":"hello","v":4,"name":"x","spec":"yes"}')).toBeNull();
+        expect(decode('{"type":"watch","m":1,"start":0,"bits":[262144]}')).toBeNull();
+        expect(decode(JSON.stringify({ type: 'watch', m: 1, start: 0, bits: new Array(129).fill(1) }))).toBeNull();
+        expect(decode('{"type":"lobby","what":"fight"}')).toBeNull();
+        // A full watch packet stays well under the message limit.
+        expect(encode({ type: 'watch', m: 0x7fffffff, start: 1 << 20, bits: new Array(128).fill(packPair(0x1ff, 0x1ff)) }).length).toBeLessThan(1200);
+        for (const [x, y] of [[0, 0], [0x1ff, 0], [0, 0x1ff], [123, 456]]) expect(unpackPair(packPair(x, y))).toEqual([x, y]);
         expect(decode('{"type":"hello","v":1,"name":"' + 'x'.repeat(5000) + '"}')).toBeNull();
         expect(decode('[1,2]')).toBeNull();
     });
@@ -228,6 +239,21 @@ describe('rollback session', () => {
             console.log(`${name}: frames A ${a.frame} B ${b.frame}, confirmed ${a.confirmedFrame}, rollbacks ${a.stats.rollbacks} (${a.stats.framesResimulated} frames, max ${a.stats.maxRollbackSeen}), stalls ${stalled}, sync pauses ${a.stats.syncPauses}/${b.stats.syncPauses}`);
         });
     }
+
+    it('a spectator replaying the confirmed inputs sees the very same match', () => {
+        const { a, b } = run({ latency: 4, jitter: 2, loss: 0.2, ticks: 3000, seed: 11, p1: 'ace', p2: 'law' });
+        const fromA = a.confirmedInputs(0);
+        expect(fromA.length).toBe(a.confirmedFrame);
+        // Both players agree on every frame they both confirmed, and on chunks.
+        const fromB = b.confirmedInputs(0);
+        const n = Math.min(fromA.length, fromB.length);
+        expect(fromA.slice(0, n)).toEqual(fromB.slice(0, n));
+        expect([...a.confirmedInputs(0, 100), ...a.confirmedInputs(100, 228), ...a.confirmedInputs(228)]).toEqual(fromA);
+        expect(a.confirmedInputs(a.confirmedFrame + 5)).toEqual([]);
+        const st = createMatch('ace', 'law');
+        for (const v of fromA) stepMatch(st, unpackPair(v));
+        expect(checksum(st)).toBe(checksum(a.confirmedState));
+    });
 
     it('plays a whole match to the end in sync with 4 frames and 20% loss', () => {
         const { a, b, ref } = run({ latency: 4, jitter: 2, loss: 0.2, ticks: 20000, seed: 9, seedA: 5, seedB: 6 });

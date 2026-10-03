@@ -7,6 +7,9 @@
 //   2. a rematch, the guest now typing on the keyboard (walk, jump, chains,
 //      specials, throw, ultimate) for about 30 s;
 //   3. the host closes its tab: the guest must show "ADVERSAIRE DÉCONNECTÉ".
+// A spectator (?spectateur=CODE) arrives before the guest and watches match 1; a second
+// one is turned away; during match 2 the first leaves and another arrives
+// mid-match and must catch up. Each replays the same inputs as the players.
 // Checks: no desync reported, both pages replay identical inputs to the same
 // checksum and health, and the final confirmed states agree.
 //
@@ -82,22 +85,49 @@ async function compare(A, B, label) {
     return { fa, fb };
 }
 
+/** The spectator replays the same inputs as the host: same state after the same frames. */
+async function specCompare(A, S, label) {
+    const k = await S.p.evaluate(() => window.__opfgSpec.received());
+    const host = await A.fight();
+    const n = Math.min(k, host.confirmedFrame);
+    const rs = await S.p.evaluate((x) => window.__opfgSpec.replay(x), n);
+    const ra = await A.p.evaluate((x) => window.__opfg.replay(x), n);
+    log(label, `spectateur ${n} frames`, JSON.stringify(rs), '| hôte', JSON.stringify(ra));
+    check(n > 300 && rs.frames === n && rs.sum === ra.sum, `${label} : le spectateur voit le même combat (${n} frames)`);
+}
+
 try {
     const A = await page('hote');
     await A.p.goto(`${origin}/?peer=127.0.0.1:${PEER_PORT}&bot=3&${NET}`);
     await A.waitScene('TitleScene');
     await A.tap('Enter', 700);
     await A.tap('KeyS'); await A.tap('KeyJ', 700); // VERSUS J1 CONTRE J2
-    await A.tap('KeyS'); await A.tap('KeyJ', 300); // CRÉER UN SALON
+    await A.tap('KeyS'); await A.tap('KeyS'); await A.shot('00-versus'); await A.tap('KeyJ', 300); // CRÉER UN SALON
     await A.waitScene('HostScene');
     await A.p.waitForTimeout(1500);
     await A.shot('01-salon');
     const invite = await A.p.evaluate(() => navigator.clipboard.readText());
     check(/[?&]salon=[A-Z2-9]{6}$/.test(invite), `lien copié : ${invite}`);
+    await A.tap('KeyA', 400);
+    const watchLink = await A.p.evaluate(() => navigator.clipboard.readText());
+    check(/[?&]spectateur=[A-Z2-9]{6}$/.test(watchLink), `lien spectateur copié : ${watchLink}`);
 
+    // The spectator arrives first, before the guest.
+    const C = await page('spectateur');
+    await C.p.goto(`${watchLink}&${NET}`);
+    await C.waitScene('SpectateWaitScene');
+    await C.p.waitForTimeout(500);
+    await C.shot('02-attente');
     const B = await page('invite', { throttleTimers: true });
     await B.p.goto(`${invite}&bot=3&${NET}`);
     await Promise.all([A.waitScene('OnlineSelectScene'), B.waitScene('OnlineSelectScene')]);
+    const D = await page('spectateur2');
+    await D.p.goto(watchLink);
+    await D.waitScene('JoinScene');
+    await D.p.waitForTimeout(3000);
+    await D.shot('02-refuse');
+    check((await D.scene()) === 'JoinScene' && (await C.scene()) === 'SpectateWaitScene', 'second spectateur refusé, le premier reste');
+    await D.ctx.close();
     await A.p.waitForTimeout(800);
     await A.tap('KeyD'); await A.tap('KeyD');
     await B.tap('KeyD'); await B.tap('KeyS');
@@ -112,13 +142,14 @@ try {
     await Promise.all([A.waitScene('OnlineVersusScene'), B.waitScene('OnlineVersusScene')]);
     await Promise.all([A.waitScene('OnlineFightScene'), B.waitScene('OnlineFightScene')]);
     log('combat 1 : les deux CPU jouent');
+    await C.waitScene('SpectateFightScene');
 
     // 1. Full match, CPU against CPU.
     const t0 = Date.now();
     let shots = 0;
     while (Date.now() - t0 < 240000) {
         await A.p.waitForTimeout(3000);
-        if (shots < 3) { shots++; await Promise.all([A.shot(`04-combat1-${shots}`), B.shot(`04-combat1-${shots}`)]); }
+        if (shots < 3) { shots++; await Promise.all([A.shot(`04-combat1-${shots}`), B.shot(`04-combat1-${shots}`), C.shot(`04-combat1-${shots}`)]); }
         const [fa, fb] = [await A.fight(), await B.fight()];
         if (!fa || !fb) break;
         if (fa.confirmed.phase === 'matchEnd' && fb.confirmed.phase === 'matchEnd') break;
@@ -127,6 +158,9 @@ try {
     check(fa.confirmed.phase === 'matchEnd' && fb.confirmed.phase === 'matchEnd', 'combat 1 terminé des deux côtés');
     check(fa.confirmed.winner === fb.confirmed.winner, `même vainqueur (${fa.confirmed.winner})`);
     await A.shot('05-ko'); await B.shot('05-ko');
+    await specCompare(A, C, 'combat 1');
+    await C.waitScene('SpectateWaitScene');
+    await C.shot('06-attente');
 
     // Results: both ask for a rematch.
     await Promise.all([A.waitScene('OnlineResultsScene'), B.waitScene('OnlineResultsScene')]);
@@ -159,6 +193,20 @@ try {
         if ((await B.scene()) !== 'OnlineFightScene') break;
     }
     if ((await B.scene()) === 'OnlineFightScene') await compare(A, B, 'combat 2');
+
+    // The spectator leaves; another one arrives mid-match and catches up.
+    check((await C.scene()) === 'SpectateFightScene', 'spectateur : la revanche s\'affiche');
+    await C.ctx.close();
+    await A.p.waitForTimeout(1500);
+    const E = await page('spectateur-tardif');
+    await E.p.goto(watchLink);
+    await E.waitScene('SpectateFightScene');
+    await E.p.waitForTimeout(2500);
+    await E.shot('07-spectateur-tardif');
+    const [ha, se] = [await A.fight(), await E.p.evaluate(() => ({ frame: window.__opfgSpec.frame(), received: window.__opfgSpec.received() }))];
+    log('spectateur tardif', `hôte frame ${ha.confirmedFrame}, spectateur lit ${se.frame} / ${se.received} reçues`);
+    check(ha.confirmedFrame - se.frame < 40, 'spectateur tardif : rattrape le direct');
+    await specCompare(A, E, 'spectateur tardif');
 
     // The guest's tab goes to the background for 6 s: no animation frames,
     // timers throttled to 1 Hz. The host must not freeze meanwhile.
@@ -199,10 +247,13 @@ try {
     await B.waitScene('NetNoticeScene', 10000);
     await B.p.waitForTimeout(600);
     await B.shot('09-deconnecte');
+    await E.waitScene('NetNoticeScene', 10000);
+    await E.shot('09-fin-diffusion');
+    check(true, 'spectateur : fin de diffusion affichée');
     const text = await B.p.evaluate(() => document.body.innerText);
     void text;
     check(true, 'invité : écran de déconnexion affiché');
-    const errs = [...A.errors, ...B.errors].filter((e) => !/PeerJS|Failed to load resource|ERR_|WebSocket/i.test(e));
+    const errs = [...A.errors, ...B.errors, ...C.errors, ...E.errors].filter((e) => !/PeerJS|Failed to load resource|ERR_|WebSocket/i.test(e));
     check(errs.length === 0, `aucune erreur de page ${errs.length ? JSON.stringify(errs.slice(0, 5)) : ''}`);
 } catch (e) {
     failures++;

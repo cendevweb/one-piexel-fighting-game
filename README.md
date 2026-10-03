@@ -134,6 +134,14 @@ affiche un lien d'invitation (copié dans le presse-papiers) et un code de
 tape le code. Chacun choisit son combattant, l'hôte choisit l'arène, puis
 combat, revanche ou retour au menu.
 
+Un spectateur (un seul par salon, pour ne pas charger la connexion de l'hôte)
+peut suivre les combats en direct : l'hôte copie le **lien spectateur**
+(`?spectateur=CODE`, touche A / ← sur l'écran du salon), ou le spectateur
+choisit **REGARDER UN SALON** et tape le code. Il peut arriver à tout moment,
+même en plein combat : l'hôte lui envoie les entrées confirmées des deux joueurs
+depuis le début du match, son navigateur rejoue le combat et rattrape le direct.
+Il n'envoie rien aux joueurs.
+
 Les deux navigateurs se parlent directement (WebRTC). La mise en relation passe
 par le service public PeerJS, sans serveur à héberger. Le netcode est à
 rollback (délai d'entrée de 2 frames, retour arrière jusqu'à 8 frames), comme

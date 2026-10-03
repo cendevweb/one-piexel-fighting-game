@@ -4,7 +4,8 @@ import { playVoice } from '../audio/voices';
 import { ROSTER } from '../characters';
 import { getChar } from '../engine/registry';
 import { KEYS, keyLabel, type MenuInput } from '../input/devices';
-import type { NetMsg } from '../net/protocol';
+import { MAX_PACKET_FRAMES, type NetMsg } from '../net/protocol';
+import type { RollbackSession } from '../net/rollback';
 import { CODE_ALPHABET, CODE_LENGTH, codeFromText } from '../net/peer-config';
 import { NET_ERROR_TEXT, NetError, hostRoom, joinRoom, type Link, type Room } from '../net/transport';
 import { drawText, textWidth } from '../render/font';
@@ -13,6 +14,7 @@ import { STAGES, stageImage } from '../render/stage';
 import { settings, updateSettings } from '../settings';
 import { OptionList, type App, type Scene } from './app';
 import { OnlineFightScene } from './onlineFight';
+import { SpectateWaitScene, SpectatorSession } from './spectate';
 import { MainMenuScene, SelectScene, VersusScene, gridStep, gridTop, sceneHooks, type Setup } from './scenes';
 import { COLORS, hint, menuBackdrop, menuItems, panel, roundPips, title } from './ui';
 
@@ -27,6 +29,10 @@ import { COLORS, hint, menuBackdrop, menuItems, panel, roundPips, title } from '
  * The host is always J1 (left), the guest J2. Each player uses the J1 keys
  * or the first gamepad. The host is authoritative for the stage and for the
  * `start` message that fixes both fighters.
+ *
+ * One spectator may join the host's room (?spectateur=CODE, game/spectate.ts):
+ * the host tells it where the players are and forwards each match's
+ * confirmed inputs.
  */
 
 const ONLINE_BACKDROP = 'shandora';
@@ -42,8 +48,25 @@ const stageBackdrop = () => (STAGES.some((s) => s.id === ONLINE_BACKDROP) ? ONLI
 export class OnlineSession {
     inbox: NetMsg[] = [];
     ended = false;
+    /** Host side: the room's spectator, if one is watching. */
+    private spec: Link | null = null;
+    /** Host side: the match being played (null between matches), for the spectator. */
+    private specMatch: { p1: string; p2: string; stage: string; seed: number } | null = null;
+    /** Frames of `specMatch` already sent to the spectator. */
+    private specSent = 0;
+    private specLobby: 'select' | 'stage' | 'results' = 'select';
 
-    constructor(readonly app: App, readonly link: Link, readonly code: string) {
+    /** `room`: the host's room, where a spectator may join. */
+    constructor(readonly app: App, readonly link: Link, readonly code: string, room?: Room) {
+        room?.onSpectator((l) => {
+            this.spec = l;
+            l.onClose(() => { if (this.spec === l) this.spec = null; });
+            if (this.ended) { l.close(); return; }
+            play('uiMove');
+            // Arriving mid-match: the whole match so far, from frame 0.
+            if (this.specMatch) { l.send({ type: 'start', ...this.specMatch }); this.specSent = 0; }
+            else l.send({ type: 'lobby', what: this.specLobby });
+        });
         link.onMessage((m) => {
             this.inbox.push(m);
             // Hidden tab: network messages keep the game ticking (see App.nudge).
@@ -52,6 +75,7 @@ export class OnlineSession {
         link.onClose((reason) => {
             if (reason === 'local' || this.ended) return;
             this.ended = true;
+            this.spec?.close();
             play('uiBack');
             app.go(new NetNoticeScene(app, 'CONNEXION PERDUE', NET_ERROR_TEXT[reason === 'left' ? 'left' : 'peerGone']));
         });
@@ -75,10 +99,42 @@ export class OnlineSession {
 
     send(msg: NetMsg): void { this.link.send(msg); }
 
+    /** A spectator is watching this room (host side). */
+    get watched(): boolean { return !!this.spec?.open; }
+
+    /** Host: the players are between matches, on this screen. */
+    watchLobby(what: 'select' | 'stage' | 'results'): void {
+        if (!this.isHost) return;
+        this.specMatch = null;
+        this.specLobby = what;
+        this.spec?.send({ type: 'lobby', what });
+    }
+
+    /** Host: a match starts (its `start` was just sent to the guest). */
+    watchStart(setup: Setup, seed: number): void {
+        if (!this.isHost) return;
+        this.specMatch = { p1: setup.p1, p2: setup.p2, stage: setup.stage, seed };
+        this.specSent = 0;
+        this.spec?.send({ type: 'start', ...this.specMatch });
+    }
+
+    /** Host, every fight tick: the frames confirmed since the last call go to the spectator. */
+    watchFrames(seed: number, rb: RollbackSession): void {
+        const spec = this.spec;
+        if (!spec?.open || this.specMatch?.seed !== seed) return;
+        while (this.specSent < rb.confirmedFrame) {
+            const bits = rb.confirmedInputs(this.specSent, this.specSent + MAX_PACKET_FRAMES);
+            if (!bits.length) break;
+            spec.send({ type: 'watch', m: seed, start: this.specSent, bits });
+            this.specSent += bits.length;
+        }
+    }
+
     /** Ends the session on a notice (something the two games disagree on). */
     fail(message: string): void {
         if (this.ended) return;
         this.ended = true;
+        this.spec?.close();
         this.link.close();
         this.app.go(new NetNoticeScene(this.app, 'PARTIE INTERROMPUE', message));
     }
@@ -97,6 +153,7 @@ export class OnlineSession {
     /** Leave on purpose: tell the other side, back to the main menu. */
     quit(): void {
         this.ended = true;
+        this.spec?.close();
         this.link.close();
         this.app.go(new MainMenuScene(this.app));
     }
@@ -122,6 +179,7 @@ function drawPing(ctx: CanvasRenderingContext2D, session: OnlineSession): void {
     const rtt = session.link.rtt;
     const color = rtt === 0 ? COLORS.dim : rtt < 80 ? '#9dff7a' : rtt < 160 ? COLORS.gold : COLORS.red;
     drawText(ctx, rtt ? `PING ${rtt} MS` : 'PING …', 632, 6, { color, outline: COLORS.ink, align: 'right' });
+    if (session.watched) drawText(ctx, '1 SPECTATEUR', 632, 18, { color: COLORS.blue, outline: COLORS.ink, align: 'right' });
 }
 
 /** "Really leave?" box shared by the lobby screens. */
@@ -160,12 +218,13 @@ class QuitConfirm {
 
 export class VersusMenuScene implements Scene {
     private t = 0;
-    private list = new OptionList(['MÊME CLAVIER', 'MANCHES À GAGNER', 'CRÉER UN SALON EN LIGNE', 'REJOINDRE UN SALON']);
+    private list = new OptionList(['MÊME CLAVIER', 'MANCHES À GAGNER', 'CRÉER UN SALON EN LIGNE', 'REJOINDRE UN SALON', 'REGARDER UN SALON']);
     private blurbs = [
         'Deux joueurs sur le même clavier ou deux manettes.',
         'Manches à remporter sur le même clavier (en ligne : toujours 2).',
         'Obtenez un lien à envoyer à votre adversaire, puis attendez-le.',
-        'Tapez ou collez le code reçu de votre adversaire.'
+        'Tapez ou collez le code reçu de votre adversaire.',
+        'Suivez en direct le combat d\'un salon, en spectateur.'
     ];
 
     constructor(private app: App, private back: Scene) {}
@@ -186,14 +245,15 @@ export class VersusMenuScene implements Scene {
         if (this.list.index === 0) this.app.go(new SelectScene(this.app, 'versus'));
         else if (this.list.index === 1) updateSettings({ versusRounds: (settings.versusRounds % 3) + 1 });
         else if (this.list.index === 2) this.app.go(new HostScene(this.app));
-        else this.app.go(new JoinScene(this.app));
+        else if (this.list.index === 3) this.app.go(new JoinScene(this.app));
+        else this.app.go(new JoinScene(this.app, '', false, true));
     }
 
     draw(ctx: CanvasRenderingContext2D): void {
         menuBackdrop(ctx, this.t, 'arlong-park');
         drawText(ctx, 'VERSUS', 44, 34, { color: '#fff', gradient: COLORS.gold, outline: COLORS.ink, scale: 4 });
         drawText(ctx, 'J1 CONTRE J2', 44, 70, { color: COLORS.cream, outline: COLORS.ink, scale: 2 });
-        panel(ctx, 30, 96, 330, 150);
+        panel(ctx, 30, 96, 330, 156);
         drawText(ctx, 'EN LIGNE', 52, 166, { color: COLORS.blue, outline: COLORS.ink });
         menuItems(ctx, this.list.items.slice(0, 2), this.list.index < 2 ? this.list.index : -1, 52, 114, this.t, 22, 2, 316);
         this.drawRounds(ctx, 136, this.list.index === 1);
@@ -294,14 +354,15 @@ export class HostScene implements Scene {
             this.room = room;
             void this.copy();
             room.onRefused((kind) => {
-                this.refused = kind === 'full' ? 'UN SECOND JOUEUR A ÉTÉ REFUSÉ' : 'UN JOUEUR A ÉTÉ REFUSÉ : VERSION DIFFÉRENTE';
+                this.refused = kind === 'full' ? 'UN SECOND JOUEUR A ÉTÉ REFUSÉ'
+                    : kind === 'specFull' ? 'UN SECOND SPECTATEUR A ÉTÉ REFUSÉ' : 'UN JOUEUR A ÉTÉ REFUSÉ : VERSION DIFFÉRENTE';
                 this.refusedAt = this.t;
             });
             room.waitForGuest().then((link) => {
                 if (this.gone) return;
                 this.gone = true;
                 play('uiSelect');
-                const session = new OnlineSession(this.app, link, room.code);
+                const session = new OnlineSession(this.app, link, room.code, room);
                 this.app.go(new OnlineSelectScene(session));
             }, (err: unknown) => {
                 if (!this.gone) this.error = err instanceof NetError ? NET_ERROR_TEXT[err.kind] : 'LE SALON A ÉTÉ FERMÉ';
@@ -313,9 +374,12 @@ export class HostScene implements Scene {
         });
     }
 
-    private async copy(): Promise<void> {
+    private copiedWhat: 'invite' | 'watch' = 'invite';
+
+    private async copy(what: 'invite' | 'watch' = 'invite'): Promise<void> {
         if (!this.room) return;
-        this.copied = (await copyText(this.room.url)) ? 'yes' : 'failed';
+        this.copiedWhat = what;
+        this.copied = (await copyText(what === 'watch' ? this.room.watchUrl : this.room.url)) ? 'yes' : 'failed';
         this.copiedAt = this.t;
     }
 
@@ -337,6 +401,7 @@ export class HostScene implements Scene {
                 return;
             }
             if ((m.action === 'confirm' || m.action === 'right') && this.room) { play('uiConfirm'); void this.copy(); }
+            if (m.action === 'left' && this.room) { play('uiConfirm'); void this.copy('watch'); }
         }
     }
 
@@ -365,7 +430,7 @@ export class HostScene implements Scene {
         drawText(ctx, this.room.url, 320, 154, { color: COLORS.blue, outline: COLORS.ink, align: 'center' });
 
         const flash = this.t - this.copiedAt < 150;
-        if (this.copied === 'yes' && flash) drawText(ctx, 'LIEN COPIÉ DANS LE PRESSE-PAPIERS !', 320, 188, { color: '#9dff7a', outline: COLORS.ink, align: 'center' });
+        if (this.copied === 'yes' && flash) drawText(ctx, this.copiedWhat === 'watch' ? 'LIEN SPECTATEUR COPIÉ !' : 'LIEN COPIÉ DANS LE PRESSE-PAPIERS !', 320, 188, { color: '#9dff7a', outline: COLORS.ink, align: 'center' });
         if (this.copied === 'failed' && flash) drawText(ctx, 'COPIE IMPOSSIBLE : RECOPIEZ LE LIEN OU LE CODE.', 320, 188, { color: COLORS.red, outline: COLORS.ink, align: 'center' });
 
         panel(ctx, 120, 210, 400, 84, COLORS.dim);
@@ -373,13 +438,14 @@ export class HostScene implements Scene {
         drawText(ctx, `EN ATTENTE DE L'ADVERSAIRE${dots}`, 140, 224, { color: '#fff', outline: COLORS.ink, scale: 2 });
         drawText(ctx, 'ENVOYEZ-LUI LE LIEN : IL ARRIVERA ICI', 320, 252, { color: '#cfc4dc', align: 'center' });
         drawText(ctx, 'DIRECTEMENT, OU IL PEUT TAPER LE CODE.', 320, 266, { color: '#cfc4dc', align: 'center' });
-        if (this.refused && this.t - this.refusedAt < 300) drawText(ctx, this.refused, 320, 304, { color: COLORS.gold, outline: COLORS.ink, align: 'center' });
+        drawText(ctx, `SPECTATEUR (1 MAX.) : ${this.room.watchUrl}`, 320, 300, { color: COLORS.dim, outline: COLORS.ink, align: 'center' });
+        if (this.refused && this.t - this.refusedAt < 300) drawText(ctx, this.refused, 320, 314, { color: COLORS.gold, outline: COLORS.ink, align: 'center' });
         else if (__PREVIEW_BUILD__) {
             // Preview URLs sit behind Vercel Authentication: the friend would hit a login page.
-            drawText(ctx, 'VERSION D\'APERÇU : CE LIEN DEMANDE UN COMPTE VERCEL.', 320, 300, { color: COLORS.gold, outline: COLORS.ink, align: 'center' });
-            if (__PUBLIC_URL__) drawText(ctx, `POUR JOUER, CRÉEZ LE SALON SUR ${__PUBLIC_URL__.replace(/^https?:\/\//, '')}`, 320, 314, { color: COLORS.gold, outline: COLORS.ink, align: 'center' });
+            drawText(ctx, 'VERSION D\'APERÇU : CE LIEN DEMANDE UN COMPTE VERCEL.', 320, 314, { color: COLORS.gold, outline: COLORS.ink, align: 'center' });
+            if (__PUBLIC_URL__) drawText(ctx, `POUR JOUER, CRÉEZ LE SALON SUR ${__PUBLIC_URL__.replace(/^https?:\/\//, '')}`, 320, 326, { color: COLORS.gold, outline: COLORS.ink, align: 'center' });
         }
-        hint(ctx, `ENTRÉE / ${keyLabel(KEYS[0].light[0])} : COPIER LE LIEN · ÉCHAP : FERMER LE SALON`);
+        hint(ctx, `ENTRÉE / ${keyLabel(KEYS[0].light[0])} : COPIER LE LIEN · ${keyLabel(KEYS[0].left[0])} / ← : LIEN SPECTATEUR · ÉCHAP : FERMER LE SALON`);
     }
 }
 
@@ -393,8 +459,8 @@ export class JoinScene implements Scene {
     private abort: AbortController | null = null;
     private active = false;
 
-    /** `auto`: came from an invite link, connect right away. */
-    constructor(private app: App, prefill = '', private auto = false) {
+    /** `auto`: came from an invite link, connect right away. `spectate`: join as the room's spectator. */
+    constructor(private app: App, prefill = '', private auto = false, private spectate = false) {
         this.code = [...prefill.toUpperCase()].filter((c) => CODE_ALPHABET.includes(c)).join('').slice(0, CODE_LENGTH);
     }
 
@@ -460,10 +526,11 @@ export class JoinScene implements Scene {
         const abort = new AbortController();
         this.abort = abort;
         const code = this.code;
-        joinRoom(code, abort.signal).then((link) => {
+        joinRoom(code, abort.signal, this.spectate).then((link) => {
             if (abort.signal.aborted || !this.active) { link.close(); return; }
             play('uiSelect');
-            this.leave(new OnlineSelectScene(new OnlineSession(this.app, link, code)));
+            if (this.spectate) this.leave(new SpectateWaitScene(new SpectatorSession(this.app, link, code)));
+            else this.leave(new OnlineSelectScene(new OnlineSession(this.app, link, code)));
         }, (err: unknown) => {
             if (abort.signal.aborted || !this.active) return;
             console.warn('Connexion au salon impossible :', err);
@@ -477,7 +544,7 @@ export class JoinScene implements Scene {
 
     draw(ctx: CanvasRenderingContext2D): void {
         menuBackdrop(ctx, this.t, stageBackdrop(), 'rgba(10,4,24,0.8)');
-        title(ctx, 'REJOINDRE UN SALON', 16);
+        title(ctx, this.spectate ? 'REGARDER UN SALON' : 'REJOINDRE UN SALON', 16);
         panel(ctx, 120, 70, 400, 120);
         drawText(ctx, 'CODE DU SALON', 320, 84, { color: COLORS.dim, outline: COLORS.ink, align: 'center' });
         // Six boxes, a gap after the third.
@@ -503,11 +570,11 @@ export class JoinScene implements Scene {
             hint(ctx, 'ÉCHAP : ANNULER');
         } else if (this.state === 'error') {
             panel(ctx, 90, 206, 460, 60, COLORS.red);
-            drawText(ctx, 'IMPOSSIBLE DE REJOINDRE', 320, 218, { color: COLORS.red, outline: COLORS.ink, scale: 2, align: 'center' });
+            drawText(ctx, this.spectate ? 'IMPOSSIBLE DE REGARDER' : 'IMPOSSIBLE DE REJOINDRE', 320, 218, { color: COLORS.red, outline: COLORS.ink, scale: 2, align: 'center' });
             drawText(ctx, this.error, 320, 246, { color: '#fff', outline: COLORS.ink, align: 'center' });
             hint(ctx, 'ENTRÉE : MODIFIER LE CODE · ÉCHAP : RETOUR');
         } else {
-            hint(ctx, 'ENTRÉE : REJOINDRE · RETOUR : EFFACER · ÉCHAP : ANNULER');
+            hint(ctx, `ENTRÉE : ${this.spectate ? 'REGARDER' : 'REJOINDRE'} · RETOUR : EFFACER · ÉCHAP : ANNULER`);
         }
     }
 }
@@ -544,6 +611,7 @@ export class OnlineSelectScene extends SelectScene {
     enter(): void {
         super.enter();
         this.announce();
+        this.session.watchLobby('select');
     }
 
     private announce(): void {
@@ -662,6 +730,8 @@ export class OnlineStageScene implements Scene {
         this.index = Math.max(0, STAGES.findIndex((s) => s.id === stage));
     }
 
+    enter(): void { this.session.watchLobby('stage'); }
+
     private go(scene: Scene): void {
         this.leaving = true;
         this.session.app.go(scene);
@@ -764,6 +834,7 @@ export class OnlineVersusScene extends VersusScene {
     private started = false;
     constructor(private session: OnlineSession, private online: Setup, private seed: number) {
         super(session.app, online);
+        session.watchStart(online, seed);
     }
 
     // No skipping: both screens should end at about the same moment.
@@ -803,7 +874,10 @@ export class OnlineResultsScene implements Scene {
         this.session.app.go(new OnlineSelectScene(this.session, this.setup));
     }
 
-    enter(): void { startMusic('results'); }
+    enter(): void {
+        startMusic('results');
+        this.session.watchLobby('results');
+    }
 
     tick(menu: MenuInput[]): void {
         this.t++;
@@ -884,18 +958,19 @@ export class OnlineResultsScene implements Scene {
 
 /**
  * The first scene: the join screen when the page was opened from an invite
- * link (?salon=CODE), else `fallback`. The parameter is removed from the
+ * link (?salon=CODE, or ?spectateur=CODE to watch), else `fallback`. The parameter is removed from the
  * address bar so a reload does not join again.
  */
 export function initialScene(app: App, fallback: Scene): Scene {
     const params = new URLSearchParams(location.search);
     // A link retyped from the screen (drawn in capitals) says ?SALON=.
-    const key = [...params.keys()].find((k) => k.toLowerCase() === 'salon');
+    // ?spectateur=CODE: the spectator's link.
+    const key = [...params.keys()].find((k) => k.toLowerCase() === 'salon' || k.toLowerCase() === 'spectateur');
     const raw = key ? params.get(key) : null;
     if (!key || !raw) return fallback;
     params.delete(key);
     const q = params.toString();
     history.replaceState(null, '', `${location.pathname}${q ? `?${q}` : ''}${location.hash}`);
     const code = codeFromText(raw);
-    return new JoinScene(app, code ?? raw, code !== null);
+    return new JoinScene(app, code ?? raw, code !== null, key.toLowerCase() === 'spectateur');
 }
