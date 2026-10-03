@@ -118,6 +118,10 @@ export function playVoice(char: string, category: VoiceCategory, channel = char,
     return true;
 }
 
+/** Whether a fight in `mode` opens with both fighters' lines: training has
+ *  no fight to open, so it stays silent. */
+export const opensWithVoices = (mode: string): boolean => mode !== 'training';
+
 /**
  * Both fighters' opening lines, J1 then J2, once at the start of a fight.
  * The same fighter twice speaks twice.

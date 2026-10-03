@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ROSTER } from '../characters';
 import manifest from '../generated/voices.json';
+import { opensWithVoices } from '../audio/voices';
 
 /** Fighters without ultimate lines until their rework. */
 const NO_ULTIMATE = ['crocodile', 'zoro'];
@@ -29,5 +30,10 @@ describe('voices', () => {
             expect(FILES.has(`${path}.ogg`), path).toBe(true);
             expect(FILES.has(`${path}.m4a`), path).toBe(true);
         }
+    });
+
+    it('opens every fight with both lines, except in training', () => {
+        for (const mode of ['arcade', 'versus', 'versusCpu', 'online', 'spectate']) expect(opensWithVoices(mode), mode).toBe(true);
+        expect(opensWithVoices('training')).toBe(false);
     });
 });

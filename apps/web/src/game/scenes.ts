@@ -1,6 +1,6 @@
 import { play } from '../audio/sound';
 import { startMusic, stopMusic } from '../audio/music';
-import { playRoundEndVoices, playStartVoices, playVoice } from '../audio/voices';
+import { opensWithVoices, playRoundEndVoices, playStartVoices, playVoice } from '../audio/voices';
 import { ROSTER } from '../characters';
 import { createMatch, METER_MAX, stepMatch } from '../engine/match';
 import { getChar } from '../engine/registry';
@@ -600,12 +600,12 @@ export class FightScene implements Scene {
         if (import.meta.env.DEV) (window as unknown as { __opfgFight?: unknown }).__opfgFight = { inputs, state: this.state };
         const events = stepMatch(this.state, inputs);
         this.view.handle(events);
-        // Both opening lines once, as the first round is called; then at
-        // each round's end, a human winner's victory line and a human
-        // loser's defeat line (in versus, both players are human).
+        // Both opening lines once, as the first round is called (never in
+        // training); then at each round's end, a human winner's victory line
+        // and a human loser's defeat line (in versus, both players are human).
         const chars = this.state.fighters.map((f) => f.char);
         for (const e of events) {
-            if (e.type === 'round' && e.round === 1) playStartVoices(chars, voiceChannel);
+            if (e.type === 'round' && e.round === 1 && opensWithVoices(this.setup.mode)) playStartVoices(chars, voiceChannel);
             if (e.type === 'roundEnd') playRoundEndVoices(chars, e.winner, this.setup.mode === 'versus' ? [0, 1] : [0], voiceChannel);
         }
         if (this.setup.mode === 'versus') { rumbleOn(events, 0, [0]); rumbleOn(events, 1, [1]); }
