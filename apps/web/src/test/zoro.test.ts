@@ -87,27 +87,27 @@ for (const foe of ['luffy', 'akainu']) {
             expect(s2.fighters[1].health).toBeLessThan(getChar(foe).health);
         });
 
-        it('the ultimate connects with a full bar and hurts', () => {
+        it('the ultimate (Sanzen Sekai) connects with a full bar and hurts', () => {
             const s = fight(foe);
             place(s);
             s.fighters[0].meter = 100;
-            const log = play(s, [heavy | special, ...holdFor(0, 220)]);
+            const log = play(s, [heavy | special, ...holdFor(0, 260)]);
             expect(log.hits[0]).toBe('ultimate');
             expect(log.hits.length).toBeGreaterThanOrEqual(2);
             expect(getChar(foe).health - s.fighters[1].health).toBeGreaterThanOrEqual(250);
         });
 
-        it('O with two bars fires Sanbyakurokuju Pound Ho and it hits hard', () => {
+        it('O with two bars unleashes Kyūtōryū Ashura and it hits hard', () => {
             const s = fight(foe);
             place(s);
             s.fighters[0].meter = 200;
             stepMatch(s, [light | heavy | special, 0]);
             expect(s.fighters[0].move).toBe('ultimate2');
             expect(s.fighters[0].meter).toBe(0);
-            const log = play(s, holdFor(0, 260));
+            const log = play(s, holdFor(0, 320));
             expect(log.hits[0]).toBe('ultimate2');
-            expect(log.hits.length).toBeGreaterThanOrEqual(4);
-            expect(getChar(foe).health - s.fighters[1].health).toBeGreaterThanOrEqual(380);
+            expect(log.hits.length).toBeGreaterThanOrEqual(6);
+            expect(getChar(foe).health - s.fighters[1].health).toBeGreaterThanOrEqual(400);
         });
 
         it('O with a single bar does nothing and keeps the gauge', () => {
@@ -125,7 +125,7 @@ for (const foe of ['luffy', 'akainu']) {
             const s = fight(foe);
             place(s);
             s.fighters[0].meter = 200;
-            const log = play(s, [...press(heavy, 8), ...mash(light | heavy | special, 16), ...holdFor(0, 260)]);
+            const log = play(s, [...press(heavy, 8), ...mash(light | heavy | special, 16), ...holdFor(0, 320)]);
             expect(unique(log.hits)).toEqual(['heavy', 'ultimate2']);
             expect(log.maxCombo).toBeGreaterThanOrEqual(4);
         });
@@ -153,7 +153,7 @@ for (const foe of ['luffy', 'akainu']) {
             expect(log.hits).toEqual(['specialF']);
         });
 
-        it('Ō Tatsumaki (↑S) catches a jump', () => {
+        it('Nobori Ryū (↑S) catches a jump', () => {
             const s = fight(foe);
             place(s, 10);
             // P2 jumps straight up; P1 answers when it is well off the ground.
@@ -178,7 +178,7 @@ for (const foe of ['luffy', 'akainu']) {
             expect(blocked.blocks).toBe(1);
         });
 
-        it('heavyFwd (Tora Gari) is an overhead: only a standing guard stops it', () => {
+        it('heavyFwd is an overhead: only a standing guard stops it', () => {
             const s = fight(foe);
             place(s);
             const hit = play(s, [right | heavy, ...holdFor(0, 50)], right | down);
@@ -198,5 +198,51 @@ for (const foe of ['luffy', 'akainu']) {
             expect(log.hits).toEqual(['heavyBack']);
             expect(s.fighters[1].y).toBeGreaterThan(0);
         });
+
+        it('Sanzen Sekai dashes through from mid range and lands Zoro behind', () => {
+            const s = fight(foe);
+            place(s, 60);
+            s.fighters[0].meter = 100;
+            const log = play(s, [heavy | special, ...holdFor(0, 260)]);
+            expect(log.hits[0]).toBe('ultimate');
+            expect(s.fighters[0].x).toBeGreaterThan(s.fighters[1].x);
+        });
     });
 }
+
+describe('Zoro staging', () => {
+    const z = getChar('zoro');
+    const panels = (slot: string) => z.manifest.cinematics?.[slot] ?? [];
+
+    it('Ashura plays the three-faced panel over the red background, the red Asura behind him and its sounds', () => {
+        const u2 = panels('ultimate2');
+        const images = u2.map((p) => p.image);
+        expect(images).toEqual(expect.arrayContaining(['ashura_bg', 'ashura_panel', 'kanon']));
+        expect(u2.some((p) => p.layout === 'fighter')).toBe(true);
+        expect(u2.some((p) => p.sfx)).toBe(true);
+        const fx = z.moves.ultimate2.fx ?? [];
+        expect(fx.some(([, anim]) => anim === 'fx_kanon')).toBe(true);
+        expect(z.manifest.anims.fx_kanon.behind).toBe(true);
+        expect(fx.some(([, anim]) => anim === 'fx_crescent')).toBe(true);
+        expect(z.moves.ultimate2.superFreeze).toBeGreaterThanOrEqual(110);
+    });
+
+    it('Sanzen Sekai is announced with its own panels and the menacing aura', () => {
+        const images = panels('ultimate').map((p) => p.image);
+        expect(images).toEqual(expect.arrayContaining(['sz_swirl', 'sz_title', 'sz_school', 'sz_sky']));
+        const fx = (z.moves.ultimate.fx ?? []).map(([, anim]) => anim);
+        expect(fx).toEqual(expect.arrayContaining(['fx_aura', 'fx_gogo']));
+    });
+
+    it('the Ashura cut-in plays from the freeze while the fight is frozen', () => {
+        const s = createMatch('zoro', 'luffy');
+        while (s.phase !== 'fight') stepMatch(s, [0, 0]);
+        place(s);
+        s.fighters[0].meter = 200;
+        const ev = stepMatch(s, [light | heavy | special, 0]);
+        expect(ev).toContainEqual(expect.objectContaining({ type: 'superFreeze', char: 'zoro', slot: 'ultimate2' }));
+        const freeze = s.freeze?.t ?? 0;
+        const end = Math.max(...panels('ultimate2').filter((p) => p.layout !== 'fighter').map((p) => p.to));
+        expect(end).toBeLessThanOrEqual(freeze + 30);
+    });
+});

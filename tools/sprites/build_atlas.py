@@ -54,10 +54,19 @@ def resolve(ref: str, bands: list[list[Box]]) -> Box:
                max(p.x1 for p in parts), max(p.y1 for p in parts))
 
 
-def fx_anchor(img: np.ndarray) -> tuple[int, int]:
+def fx_anchor(img: np.ndarray, color: str | None = None, bottom: bool = False) -> tuple[int, int]:
+    """Centre of an effect. `color: "blue"` only counts the blue part, so
+    sound-effect lettering drawn over a blue blast does not drag the anchor
+    from one frame to the next; `bottom` anchors on the lowest such pixel
+    (a pillar growing from the ground)."""
     solid = img[:, :, 3] > 0
+    if color == "blue":
+        rgb = img[:, :, :3].astype(int)
+        blue = solid & (rgb[:, :, 2] - rgb[:, :, 0] > 40)
+        if blue.sum() > 8:
+            solid = blue
     ys, xs = np.nonzero(solid)
-    return int(round(xs.mean())), int(round(ys.mean()))
+    return int(round(xs.mean())), int(ys.max() if bottom else round(ys.mean()))
 
 
 def reach(img: np.ndarray, ax: int, ay: int, front: int) -> list[int] | int:
@@ -110,21 +119,21 @@ def build(cid: str, src: dict, contact_dir: str | None) -> None:
     bands = detect(rgba, seg.get("rowGap", 2), seg.get("colGap", 3))
 
     # Cut every referenced frame once, even when several animations share it.
-    cache: dict[tuple[str, bool, bool, bool], dict] = {}
+    cache: dict[tuple, dict] = {}
     anims_out: dict[str, dict] = {}
-    order: list[tuple[str, bool, bool, bool]] = []
+    order: list[tuple] = []
     for name, anim in src["anims"].items():
         flip = bool(anim.get("flip"))
         fx = bool(anim.get("fx"))
         refs = []
         for i, ref in enumerate(anim["frames"]):
             back = anim.get("anchor") == "back" or i in anim.get("anchorBack", [])
-            key = (ref, flip, fx, back)
+            key = (ref, flip, fx, back, anim.get("anchorColor"), anim.get("anchorY"))
             if key not in cache:
                 box = resolve(ref, bands)
                 img = rgba[box.y0:box.y1, box.x0:box.x1].copy()
                 if fx:
-                    ax, ay = fx_anchor(img)
+                    ax, ay = fx_anchor(img, anim.get("anchorColor"), anim.get("anchorY") == "bottom")
                 else:
                     # "anchor": "back" looks for the feet behind the fighter
                     # only; a giant fist on the ground in front would

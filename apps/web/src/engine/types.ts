@@ -159,6 +159,9 @@ export interface MoveDef {
     motion?: [number, number, number][];
     /** Animation frames (inclusive) during which the fighter cannot be hit. */
     invuln?: [number, number];
+    /** Animation frames (inclusive) during which the fighter's body does not
+     *  push the opponent: a dash that cuts through and ends behind. */
+    passThrough?: [number, number];
     /** Air moves: gravity keeps applying unless this says otherwise. */
     noGravity?: boolean;
     /** Air moves end on landing and play this many ticks of landing lag. */
