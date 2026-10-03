@@ -45,7 +45,22 @@ describe.each(ROSTER.map((c) => [c.id, c] as const))('%s', (_id, def) => {
         for (const [slot, move] of Object.entries(def.moves)) {
             const sounds = [move.sfx, move.projectile?.hit.sfx, ...move.hits.map((h) => h.sfx)];
             for (const sfx of sounds) if (sfx) expect(hasSound(sfx), `${slot} sfx ${sfx}`).toBe(true);
-            for (const [, fx] of move.fx ?? []) expect(def.manifest.anims[fx], `${slot} fx ${fx}`).toBeDefined();
+            for (const [, fx, , , fxSfx] of move.fx ?? []) {
+                expect(def.manifest.anims[fx], `${slot} fx ${fx}`).toBeDefined();
+                if (fxSfx) expect(hasSound(fxSfx), `${slot} fx sfx ${fxSfx}`).toBe(true);
+            }
+        }
+    });
+
+    it('stages its ultimate cut-in sequences with images and sounds that exist', () => {
+        for (const [slot, panels] of Object.entries(def.manifest.cinematics ?? {})) {
+            expect(def.moves[slot as keyof typeof def.moves]?.superFreeze, `${slot} has a freeze`).toBeGreaterThan(0);
+            for (const p of panels) {
+                if (p.image) expect(def.manifest.images[p.image], `${slot} image ${p.image}`).toBeDefined();
+                if (p.anim) expect(def.manifest.anims[p.anim], `${slot} anim ${p.anim}`).toBeDefined();
+                if (p.sfx) expect(hasSound(p.sfx), `${slot} sfx ${p.sfx}`).toBe(true);
+                expect(p.to, `${slot} panel ends after it starts`).toBeGreaterThan(p.from);
+            }
         }
     });
 

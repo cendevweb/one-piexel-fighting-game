@@ -18,6 +18,8 @@ interface SpriteFx {
     scale: number;
     additive: boolean;
     alpha: number;
+    /** Drawn behind the fighters. */
+    behind: boolean;
 }
 
 type ParticleKind = 'spark' | 'dust' | 'ember' | 'bolt' | 'shard' | 'smoke' | 'streak';
@@ -63,9 +65,12 @@ export class Vfx {
         return this.seed / 2147483647;
     }
 
-    sprite(atlas: string, anim: string, x: number, y: number, facing: 1 | -1 = 1, opts: Partial<Pick<SpriteFx, 'per' | 'scale' | 'additive' | 'alpha'>> = {}): void {
+    sprite(atlas: string, anim: string, x: number, y: number, facing: 1 | -1 = 1, opts: Partial<Pick<SpriteFx, 'per' | 'scale' | 'additive' | 'alpha' | 'behind'>> = {}): void {
         if (!hasAnim(atlas, anim)) return;
-        this.sprites.push({ atlas, anim, x, y, facing, t: 0, per: opts.per ?? 3, scale: opts.scale ?? 1, additive: opts.additive ?? false, alpha: opts.alpha ?? 1 });
+        this.sprites.push({
+            atlas, anim, x, y, facing, t: 0, per: opts.per ?? 3, scale: opts.scale ?? 1,
+            additive: opts.additive ?? false, alpha: opts.alpha ?? 1, behind: opts.behind ?? false
+        });
     }
 
     burst(x: number, y: number, n: number, kind: ParticleKind, colors: string[], speed: number, opts: { gravity?: number; life?: number; size?: number; dir?: number; spread?: number; drag?: number } = {}): void {
@@ -293,9 +298,18 @@ export class Vfx {
         if (this.flash < 0.02) this.flash = 0;
     }
 
+    /** Effects that stand behind the fighters, drawn before them. */
+    drawBehind(ctx: CanvasRenderingContext2D): void {
+        for (const s of this.sprites) {
+            if (!s.behind) continue;
+            drawFrame(ctx, s.atlas, s.anim, Math.floor(s.t / s.per), s.x, s.y, s.facing, { scale: s.scale, additive: s.additive, alpha: s.alpha });
+        }
+    }
+
     /** World-space drawing (context already offset by the camera). */
     draw(ctx: CanvasRenderingContext2D): void {
         for (const s of this.sprites) {
+            if (s.behind) continue;
             drawFrame(ctx, s.atlas, s.anim, Math.floor(s.t / s.per), s.x, s.y, s.facing, { scale: s.scale, additive: s.additive, alpha: s.alpha });
         }
         ctx.save();

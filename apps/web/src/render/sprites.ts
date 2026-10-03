@@ -84,6 +84,22 @@ export function animAlpha(id: string, anim: string): number {
     return atlases.get(id)?.manifest.anims[anim]?.alpha ?? 1;
 }
 
+/** Ticks per frame of an effect: its manifest `fps`, else `fallback`. */
+export function animPer(id: string, anim: string, fallback = 3): number {
+    const fps = atlases.get(id)?.manifest.anims[anim]?.fps;
+    return fps ? Math.max(1, Math.round(60 / fps)) : fallback;
+}
+
+/** Effects declared `behind` play behind the fighters. */
+export function animBehind(id: string, anim: string): boolean {
+    return !!atlases.get(id)?.manifest.anims[anim]?.behind;
+}
+
+/** The manifest of a loaded atlas. */
+export function manifestOf(id: string): SpriteManifest | undefined {
+    return atlases.get(id)?.manifest;
+}
+
 export function hasAnim(id: string, anim: string): boolean {
     return !!atlases.get(id)?.manifest.anims[anim];
 }

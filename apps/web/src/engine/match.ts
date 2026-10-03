@@ -155,9 +155,9 @@ function applyMotion(f: FighterState, move: MoveDef): void {
 }
 
 function frameEvents(state: MatchState, f: FighterState, move: MoveDef, events: GameEvent[]): void {
-    for (const [frame, anim, x, y] of move.fx ?? []) {
+    for (const [frame, anim, x, y, sfx] of move.fx ?? []) {
         if (frame === f.frame) {
-            events.push({ type: 'fx', side: f.side, anim, x: f.x + px(x) * f.facing, y: f.y + px(y), facing: f.facing });
+            events.push({ type: 'fx', side: f.side, anim, x: f.x + px(x) * f.facing, y: f.y + px(y), facing: f.facing, ...(sfx ? { sfx } : {}) });
         }
     }
     const p = move.projectile;
