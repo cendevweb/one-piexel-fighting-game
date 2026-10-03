@@ -108,7 +108,10 @@ export class TitleScene implements Scene {
         // behind, so ten fighters fit the width without covering each other.
         const n = ROSTER.length;
         const gap = Math.min(104, 600 / n);
-        const order = ROSTER.map((c, i) => ({ c, i })).sort((a, b) => (b.i % 2) - (a.i % 2));
+        // Within a rank the widest sprites go down first, so a long sword or
+        // a giant does not bury a slimmer fighter standing next to it.
+        const width = (c: (typeof ROSTER)[number]) => c.manifest.anims.idle.frames[0][2];
+        const order = ROSTER.map((c, i) => ({ c, i })).sort((a, b) => (b.i % 2) - (a.i % 2) || width(b.c) - width(a.c));
         for (const { c, i } of order) {
             const x = 320 + (i - (n - 1) / 2) * gap;
             const back = n > 5 && i % 2 === 1;
