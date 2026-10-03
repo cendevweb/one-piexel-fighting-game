@@ -7,7 +7,8 @@ import { getChar } from '../engine/registry';
 import type { GameEvent, MatchState } from '../engine/types';
 import { endInputTick, type MenuInput } from '../input/devices';
 import { checksum } from '../net/checksum';
-import { unpackPair, type NetMsg } from '../net/protocol';
+import type { NetMsg } from '../net/protocol';
+import { SpectatorFeed, type LobbyWhat as LobbyMsgWhat } from '../net/spectator';
 import { NET_ERROR_TEXT, type Link } from '../net/transport';
 import { drawText } from '../render/font';
 import { FightView, voiceChannel } from '../render/fightView';
@@ -31,16 +32,13 @@ import { COLORS, hint, menuBackdrop, menuItems, panel, title } from './ui';
  * hidden). Nothing it does reaches the players.
  */
 
-/** Frames kept in hand before playing, against jitter (~100 ms). */
-const BUFFER = 6;
-/** Further behind than this: jump ahead without effects or sounds. */
-const CATCH_UP = 120;
 /** After the KO, as long as the players' own end of match. */
 const END_DELAY = 150;
 /** Out of frames for this long: say we are waiting. */
 const STALL_NOTICE = 30;
 
-export type LobbyWhat = 'select' | 'stage' | 'results' | 'waiting' | 'none';
+/** `none`: nothing heard yet (the room has no guest). */
+export type LobbyWhat = LobbyMsgWhat | 'none';
 
 /** The spectator's link to the host's room. */
 export class SpectatorSession {
@@ -216,10 +214,8 @@ export class SpectateFightScene implements Scene {
     readonly runsHidden = true;
     private state: MatchState;
     private view: FightView;
-    /** Both players' inputs, packed, for frames 0 .. inputs.length - 1. */
-    private inputs: number[] = [];
-    private frame = 0;
-    private playing = false;
+    /** The received inputs and the playback pace (net/spectator.ts). */
+    private feed: SpectatorFeed;
     private starved = 0;
     private t = 0;
     private endT = 0;
@@ -230,15 +226,13 @@ export class SpectateFightScene implements Scene {
 
     constructor(private session: SpectatorSession, private setup: Setup, private seed: number) {
         this.state = createMatch(setup.p1, setup.p2);
+        this.feed = new SpectatorFeed(seed);
         const stage = STAGES.find((s) => s.id === setup.stage) ?? STAGES[0];
         this.view = new FightView(this.state, stage, { names: ['J1', 'J2'] });
         this.exposeDebug();
     }
 
     enter(): void { startMusic(this.setup.stage); }
-
-    /** Frames received but not played yet. */
-    get backlog(): number { return this.inputs.length - this.frame; }
 
     tick(menu: MenuInput[]): void {
         this.t++;
@@ -249,19 +243,13 @@ export class SpectateFightScene implements Scene {
         if (this.leave.handle(menu)) { this.done = true; this.session.quit(); return; }
 
         // Far behind: jump ahead without effects, then play normally.
-        if (this.backlog > CATCH_UP) {
-            while (this.backlog > BUFFER) this.step();
-            this.playing = true;
-        }
-        if (!this.playing && (this.backlog >= BUFFER || this.state.phase === 'matchEnd')) this.playing = true;
-        if (this.playing && this.backlog === 0 && this.state.phase !== 'matchEnd') this.playing = false;
-        this.starved = this.playing || this.state.phase === 'matchEnd' ? 0 : this.starved + 1;
-
-        if (this.playing) {
-            // Getting behind (a slow tick, a burst after a hiccup): two frames a tick.
-            const steps = Math.min(this.backlog, this.backlog > BUFFER * 3 ? 2 : 1);
+        const over = this.state.phase === 'matchEnd';
+        const { skip, play } = this.feed.plan(over);
+        for (let i = 0; i < skip; i++) stepMatch(this.state, this.feed.next());
+        this.starved = this.feed.starved ? this.starved + 1 : 0;
+        if (play || over) {
             const out: GameEvent[] = [];
-            for (let i = 0; i < steps; i++) out.push(...this.step());
+            for (let i = 0; i < play; i++) out.push(...stepMatch(this.state, this.feed.next()));
             if (out.length) this.show(out);
             this.view.update();
         }
@@ -272,22 +260,13 @@ export class SpectateFightScene implements Scene {
         }
     }
 
-    private step(): GameEvent[] {
-        const ev = stepMatch(this.state, unpackPair(this.inputs[this.frame]));
-        this.frame++;
-        return ev;
-    }
-
     private receive(): void {
         if (this.nextQueued) return;
         const inbox = this.session.take();
         for (let n = 0; n < inbox.length; n++) {
             const msg = inbox[n];
             if (msg.type === 'watch' && msg.m === this.seed) {
-                // Reliable and ordered: each packet starts where the last one ended.
-                const skip = this.inputs.length - msg.start;
-                if (skip < 0) { console.warn(`[spectateur] trou dans les frames (${this.inputs.length} → ${msg.start})`); continue; }
-                for (let i = skip; i < msg.bits.length; i++) this.inputs.push(msg.bits[i]);
+                if (!this.feed.push(msg)) console.warn(`[spectateur] trou dans les frames (${this.feed.received} → ${msg.start})`);
             } else if (msg.type === 'lobby' && msg.what === 'waiting' && this.state.phase !== 'matchEnd') {
                 // The guest left mid-match: the match will never end.
                 this.done = true;
@@ -336,12 +315,13 @@ export class SpectateFightScene implements Scene {
     /** Read-only hook for the end-to-end test (dev server or ?netdebug). */
     private exposeDebug(): void {
         if (!import.meta.env.DEV && !new URLSearchParams(location.search).has('netdebug')) return;
-        const view = { seed: this.seed, frame: () => this.frame, received: () => this.inputs.length, phase: () => this.state.phase,
+        const feed = this.feed;
+        const view = { seed: this.seed, frame: () => feed.played, received: () => feed.received, phase: () => this.state.phase,
             /** State after `n` received frames, to compare with the players' own replay. */
             replay: (n: number) => {
                 const st = createMatch(this.setup.p1, this.setup.p2);
-                const k = Math.min(n, this.inputs.length);
-                for (let f = 0; f < k; f++) stepMatch(st, unpackPair(this.inputs[f]));
+                const k = Math.min(n, feed.received);
+                for (let f = 0; f < k; f++) stepMatch(st, feed.inputAt(f));
                 return { frames: k, health: st.fighters.map((f) => f.health), sum: checksum(st) };
             }
         };
