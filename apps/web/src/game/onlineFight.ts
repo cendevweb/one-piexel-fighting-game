@@ -253,7 +253,7 @@ export class OnlineFightScene implements Scene {
         const rtt = this.session.link.rtt;
         const color = rtt === 0 ? COLORS.dim : rtt < 80 ? '#9dff7a' : rtt < 160 ? COLORS.gold : COLORS.red;
         drawText(ctx, rtt ? `PING ${rtt} MS` : 'PING …', 320, 348, { color, outline: COLORS.ink, align: 'center' });
-        if (this.session.watched) drawText(ctx, '1 SPECTATEUR', 632, 348, { color: COLORS.blue, outline: COLORS.ink, align: 'right' });
+        if (this.session.watched) drawText(ctx, '1 SPECTATEUR', 632, 352, { color: COLORS.blue, outline: COLORS.ink, align: 'right' });
         if (this.stalledFor > STALL_NOTICE) {
             const dots = '.'.repeat(1 + ((this.t >> 4) % 3));
             ctx.fillStyle = 'rgba(0,0,0,0.6)';
