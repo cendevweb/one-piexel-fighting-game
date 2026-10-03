@@ -44,8 +44,11 @@ export type NetMsg =
      * arriving mid-match replays it to the present).
      */
     | { type: 'watch'; m: number; start: number; bits: number[] }
-    /** Host → spectator: what the players are doing between two matches. */
-    | { type: 'lobby'; what: 'select' | 'stage' | 'results' }
+    /**
+     * Host → spectator: what the players are doing between two matches;
+     * `waiting`: the guest left, the host waits for another.
+     */
+    | { type: 'lobby'; what: 'select' | 'stage' | 'results' | 'waiting' }
     /**
      * After a match: back to the character select, both players, same room.
      * `m` names the match just played (its `start` seed), so a request that
@@ -152,7 +155,7 @@ export function decode(data: unknown): NetMsg | null {
             if (m.bits.length > MAX_PACKET_FRAMES || !m.bits.every((b) => int(b, 0, 0x3ffff))) return null;
             return { type: 'watch', m: m.m, start: m.start, bits: m.bits as number[] };
         case 'lobby':
-            if (m.what !== 'select' && m.what !== 'stage' && m.what !== 'results') return null;
+            if (m.what !== 'select' && m.what !== 'stage' && m.what !== 'results' && m.what !== 'waiting') return null;
             return { type: 'lobby', what: m.what };
         case 'reselect':
             if (!int(m.m, 0, 0x7fffffff)) return null;

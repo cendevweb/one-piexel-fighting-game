@@ -134,6 +134,12 @@ affiche un lien d'invitation (copié dans le presse-papiers) et un code de
 tape le code. Chacun choisit son combattant, l'hôte choisit l'arène, puis
 combat, revanche ou retour au menu.
 
+Le salon reste ouvert tant que l'hôte est là : si l'adversaire s'en va (ou perd
+la connexion), à n'importe quel moment, même en plein combat, l'hôte revient à
+l'écran d'attente du salon, avec le même code et le même lien, et un autre
+joueur peut le rejoindre. Si c'est l'hôte qui part, l'invité est prévenu et
+revient au menu VERSUS.
+
 Un spectateur (un seul par salon, pour ne pas charger la connexion de l'hôte)
 peut suivre les combats en direct : l'hôte copie le **lien spectateur**
 (`?spectateur=CODE`, touche A / ← sur l'écran du salon), ou le spectateur
