@@ -7,16 +7,17 @@
  */
 
 /** Bump whenever a message or the simulation changes incompatibly. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export type NetMsg =
     /**
      * First message of the guest; the host answers with helloAck. `b`: the
      * build fingerprint (net/fingerprint.ts): two builds whose simulations
      * differ cannot play together even under the same protocol version.
+     * `spec`: a spectator, not the second player (one at most per room).
      */
-    | { type: 'hello'; v: number; name: string; b?: number }
-    | { type: 'helloAck'; v: number; ok: boolean; reason?: 'version' | 'full' | string }
+    | { type: 'hello'; v: number; name: string; b?: number; spec?: boolean }
+    | { type: 'helloAck'; v: number; ok: boolean; reason?: 'version' | 'full' | 'specFull' | string }
     /** Character select: cursor / chosen fighter and whether it is locked in. */
     | { type: 'select'; char: string; ready: boolean }
     /** Stage chosen by the host. */
@@ -37,6 +38,15 @@ export type NetMsg =
     | { type: 'checksum'; frame: number; sum: number; m?: number }
     | { type: 'rematch'; want: boolean }
     /**
+     * Host → spectator, reliable: the confirmed inputs of both players for
+     * frames `start .. start + bits.length - 1` of match `m`, each packed as
+     * `p1 | p2 << 9`. Sent in order with no gap, from frame 0 (a spectator
+     * arriving mid-match replays it to the present).
+     */
+    | { type: 'watch'; m: number; start: number; bits: number[] }
+    /** Host → spectator: what the players are doing between two matches. */
+    | { type: 'lobby'; what: 'select' | 'stage' | 'results' }
+    /**
      * After a match: back to the character select, both players, same room.
      * `m` names the match just played (its `start` seed), so a request that
      * crossed a rematch never pulls the next match's results screen back.
@@ -52,6 +62,11 @@ export type NetMsgType = NetMsg['type'];
 
 export type InputMsg = Extract<NetMsg, { type: 'input' }>;
 export type ChecksumMsg = Extract<NetMsg, { type: 'checksum' }>;
+export type WatchMsg = Extract<NetMsg, { type: 'watch' }>;
+
+/** Both players' inputs of one frame in one number (a `watch` entry). */
+export const packPair = (p1: number, p2: number): number => (p1 & 0x1ff) | ((p2 & 0x1ff) << 9);
+export const unpackPair = (v: number): [number, number] => [v & 0x1ff, (v >> 9) & 0x1ff];
 
 export function encode(msg: NetMsg): string {
     return JSON.stringify(msg);
@@ -87,9 +102,14 @@ export function decode(data: unknown): NetMsg | null {
     if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
     const m = o as Record<string, unknown>;
     switch (m.type) {
-        case 'hello':
+        case 'hello': {
             if (!int(m.v, 0, 1e6) || typeof m.name !== 'string' || m.name.length > 32 || !optInt(m.b, 0, 0xffffffff)) return null;
-            return m.b === undefined ? { type: 'hello', v: m.v, name: m.name } : { type: 'hello', v: m.v, name: m.name, b: m.b as number };
+            if (m.spec !== undefined && typeof m.spec !== 'boolean') return null;
+            const r: NetMsg = { type: 'hello', v: m.v, name: m.name };
+            if (m.b !== undefined) r.b = m.b as number;
+            if (m.spec === true) r.spec = true;
+            return r;
+        }
         case 'helloAck': {
             if (!int(m.v, 0, 1e6) || typeof m.ok !== 'boolean') return null;
             if (m.reason !== undefined && (typeof m.reason !== 'string' || m.reason.length > 32)) return null;
@@ -127,6 +147,13 @@ export function decode(data: unknown): NetMsg | null {
         case 'rematch':
             if (typeof m.want !== 'boolean') return null;
             return { type: 'rematch', want: m.want };
+        case 'watch':
+            if (!int(m.m, 0, 0x7fffffff) || !int(m.start, 0, MAX_FRAME) || !Array.isArray(m.bits)) return null;
+            if (m.bits.length > MAX_PACKET_FRAMES || !m.bits.every((b) => int(b, 0, 0x3ffff))) return null;
+            return { type: 'watch', m: m.m, start: m.start, bits: m.bits as number[] };
+        case 'lobby':
+            if (m.what !== 'select' && m.what !== 'stage' && m.what !== 'results') return null;
+            return { type: 'lobby', what: m.what };
         case 'reselect':
             if (!int(m.m, 0, 0x7fffffff)) return null;
             return { type: 'reselect', m: m.m };

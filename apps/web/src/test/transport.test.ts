@@ -19,6 +19,7 @@ describe('room codes', () => {
         expect(codeFromText('ABC-DEF')).toBe('ABCDEF');
         expect(codeFromText('https://x.app/?salon=K7P2QM')).toBe('K7P2QM');
         expect(codeFromText('http://127.0.0.1:5201/?peer=127.0.0.1:9000&salon=k7p2qm')).toBe('K7P2QM');
+        expect(codeFromText('https://x.app/?spectateur=K7P2QM')).toBe('K7P2QM');
         expect(codeFromText('ABCDE')).toBeNull();
         expect(codeFromText('ABCDE0')).toBeNull();
     });
@@ -27,6 +28,7 @@ describe('room codes', () => {
         expect(peerIdFor('K7P2QM')).toBe('onepeaxel-salon-k7p2qm');
         const loc = { origin: 'https://game.example', pathname: '/' };
         expect(inviteUrl('K7P2QM', loc)).toBe('https://game.example/?salon=K7P2QM');
+        expect(inviteUrl('K7P2QM', loc, undefined, OFFICIAL_URL, 'spectateur')).toBe('https://www.one-piexel.gg/?spectateur=K7P2QM');
         const debug = inviteUrl('K7P2QM', loc, '127.0.0.1:9000');
         expect(codeFromText(debug)).toBe('K7P2QM');
         expect(new URL(debug).searchParams.get('peer')).toBe('127.0.0.1:9000');

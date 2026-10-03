@@ -41,6 +41,10 @@ export interface FightLink {
     putBack(rest: NetMsg[]): void;
     send(msg: NetMsg): void;
     quit(): void;
+    /** A spectator is watching (host side). */
+    readonly watched: boolean;
+    /** Host: forwards the newly confirmed frames to the spectator, if any. */
+    watchFrames(seed: number, rb: RollbackSession): void;
 }
 
 /** Frames of local input delay (`?netdelay=N` to try other values). */
@@ -143,6 +147,7 @@ export class OnlineFightScene implements Scene {
         // A stalled tick drops our input: keep a short tap for the next one.
         if (!r.stalled) endInputTick();
         for (const m of r.outgoing) this.session.send({ ...m, m: this.seed } as NetMsg);
+        this.session.watchFrames(this.seed, this.rb);
         this.stalledFor = r.stallReason === 'remote' ? this.stalledFor + 1 : 0;
         this.view.state = this.rb.state;
         this.showEvents();
@@ -248,6 +253,7 @@ export class OnlineFightScene implements Scene {
         const rtt = this.session.link.rtt;
         const color = rtt === 0 ? COLORS.dim : rtt < 80 ? '#9dff7a' : rtt < 160 ? COLORS.gold : COLORS.red;
         drawText(ctx, rtt ? `PING ${rtt} MS` : 'PING …', 320, 348, { color, outline: COLORS.ink, align: 'center' });
+        if (this.session.watched) drawText(ctx, '1 SPECTATEUR', 632, 348, { color: COLORS.blue, outline: COLORS.ink, align: 'right' });
         if (this.stalledFor > STALL_NOTICE) {
             const dots = '.'.repeat(1 + ((this.t >> 4) % 3));
             ctx.fillStyle = 'rgba(0,0,0,0.6)';

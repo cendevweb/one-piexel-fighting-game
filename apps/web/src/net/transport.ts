@@ -31,6 +31,8 @@ export type NetErrorKind =
     | 'version'
     /** The room already has a guest. */
     | 'full'
+    /** The room already has its spectator. */
+    | 'specFull'
     /** The broker found the room but no direct connection could be made. */
     | 'timeout'
     /** No WebRTC in this browser. */
@@ -42,6 +44,7 @@ export const NET_ERROR_TEXT: Record<NetErrorKind | 'left', string> = {
     peerGone: 'ADVERSAIRE DÉCONNECTÉ',
     version: 'VERSIONS DU JEU DIFFÉRENTES : RECHARGEZ LA PAGE',
     full: 'CE SALON EST DÉJÀ COMPLET',
+    specFull: 'UN SPECTATEUR REGARDE DÉJÀ CE SALON',
     timeout: 'CONNEXION DIRECTE IMPOSSIBLE (RÉSEAU)',
     unsupported: 'NAVIGATEUR INCOMPATIBLE (WEBRTC)',
     left: 'L\'ADVERSAIRE A QUITTÉ LE SALON'
@@ -75,11 +78,19 @@ export interface Room {
     code: string;
     /** The invite link: this page with ?salon=CODE. */
     url: string;
+    /** The spectator's link: ?spectateur=CODE. */
+    watchUrl: string;
     /** Resolves with the first guest that passes the hello; rejects if the room dies. */
     waitForGuest(): Promise<Link>;
     onGuest(cb: (link: Link) => void): void;
     /** A visitor was turned away (other version, room already full). */
     onRefused(cb: (kind: NetErrorKind) => void): void;
+    /**
+     * A spectator joined (at most one at a time, before or after the guest).
+     * Its link shares the room's connection to the broker: closing it leaves
+     * the guest alone.
+     */
+    onSpectator(cb: (link: Link) => void): void;
     /** Abandons the room (before or after a guest joined). */
     close(): void;
 }
@@ -199,7 +210,8 @@ class PeerLink implements Link {
     private onUnload = () => this.close(true);
     private sim = typeof location === 'undefined' ? null : netSimFrom(location.search);
 
-    constructor(readonly side: 0 | 1, private peer: Peer, private conn: DataConnection) {
+    /** `ownsPeer`: false for the host's spectator link, which shares the room's Peer with the guest's. */
+    constructor(readonly side: 0 | 1, private peer: Peer, private conn: DataConnection, private ownsPeer = true) {
         conn.on('data', (d) => this.receive(d));
         conn.on('close', () => this.shut('peerGone'));
         conn.on('error', () => this.shut('peerGone'));
@@ -267,8 +279,8 @@ class PeerLink implements Link {
         if (!this.open) return;
         this.send(pageClosed ? { type: 'leave', closed: true } : { type: 'leave' });
         // Give the goodbye a moment to leave before tearing everything down.
-        const peer = this.peer;
-        setTimeout(() => peer.destroy(), 300);
+        const { peer, conn } = this;
+        setTimeout(() => (this.ownsPeer ? peer.destroy() : conn.close()), 300);
         this.shut('local', false);
     }
 
@@ -306,7 +318,10 @@ class PeerLink implements Link {
         this.open = false;
         clearInterval(this.timer);
         window.removeEventListener('pagehide', this.onUnload);
-        if (destroy) this.peer.destroy();
+        if (destroy) {
+            if (this.ownsPeer) this.peer.destroy();
+            else this.conn.close();
+        }
         for (const cb of this.closeCbs) cb(reason);
     }
 }
@@ -330,15 +345,17 @@ export async function hostRoom(): Promise<Room> {
     }
     const p = peer;
     let link: PeerLink | null = null;
+    let spectator: PeerLink | null = null;
     let closed = false;
     const guestCbs: ((l: Link) => void)[] = [];
+    const spectatorCbs: ((l: Link) => void)[] = [];
     const refusedCbs: ((k: NetErrorKind) => void)[] = [];
     let resolveGuest!: (l: Link) => void;
     let rejectGuest!: (e: Error) => void;
     const guest = new Promise<Link>((res, rej) => { resolveGuest = res; rejectGuest = rej; });
     guest.catch(() => { /* surfaced to whoever awaits it */ });
 
-    const refuse = (conn: DataConnection, reason: 'version' | 'full') => {
+    const refuse = (conn: DataConnection, reason: 'version' | 'full' | 'specFull') => {
         conn.send(encode({ type: 'helloAck', v: PROTOCOL_VERSION, ok: false, reason }));
         setTimeout(() => conn.close(), 500);
         for (const cb of refusedCbs) cb(reason);
@@ -350,8 +367,16 @@ export async function hostRoom(): Promise<Room> {
             const msg = typeof data === 'string' ? decode(data) : null;
             if (!msg || msg.type !== 'hello') return;
             conn.off('data', onData);
-            if (link) { refuse(conn, 'full'); return; }
+            if (msg.spec ? spectator?.open : link) { refuse(conn, msg.spec ? 'specFull' : 'full'); return; }
             if (msg.v !== PROTOCOL_VERSION || msg.b !== buildFingerprint()) { refuse(conn, 'version'); return; }
+            if (msg.spec) {
+                conn.send(encode({ type: 'helloAck', v: PROTOCOL_VERSION, ok: true }));
+                const s = new PeerLink(0, p, conn, false);
+                spectator = s;
+                s.onClose(() => { if (spectator === s) spectator = null; });
+                for (const cb of spectatorCbs) cb(s);
+                return;
+            }
             conn.send(encode({ type: 'helloAck', v: PROTOCOL_VERSION, ok: true }));
             link = new PeerLink(0, p, conn);
             resolveGuest(link);
@@ -359,10 +384,11 @@ export async function hostRoom(): Promise<Room> {
         };
         conn.on('data', onData);
     });
-    // Losing the broker only matters while nobody has joined yet.
+    // Stay on the broker as long as the room is open: after the guest, a
+    // spectator may still come.
     p.on('disconnected', () => {
-        if (link || closed) return;
-        setTimeout(() => { if (!closed && !link && !p.destroyed) p.reconnect(); }, 1000);
+        if (closed) return;
+        setTimeout(() => { if (!closed && !p.destroyed && p.disconnected) p.reconnect(); }, 1000);
     });
     p.on('error', (err) => {
         if (link || closed) return;
@@ -374,15 +400,19 @@ export async function hostRoom(): Promise<Room> {
     });
 
     const cfg = currentPeerConfig();
+    const publicUrl = __PREVIEW_BUILD__ ? undefined : __PUBLIC_URL__;
     return {
         code,
-        url: inviteUrl(code, location, cfg.debugPeer, __PREVIEW_BUILD__ ? undefined : __PUBLIC_URL__),
+        url: inviteUrl(code, location, cfg.debugPeer, publicUrl),
+        watchUrl: inviteUrl(code, location, cfg.debugPeer, publicUrl, 'spectateur'),
         waitForGuest: () => guest,
         onGuest: (cb) => { guestCbs.push(cb); if (link) cb(link); },
         onRefused: (cb) => { refusedCbs.push(cb); },
+        onSpectator: (cb) => { spectatorCbs.push(cb); if (spectator?.open) cb(spectator); },
         close: () => {
             if (closed) return;
             closed = true;
+            spectator?.close();
             if (link) link.close();
             else p.destroy();
             rejectGuest(new Error('salon fermé'));
@@ -395,8 +425,9 @@ export async function hostRoom(): Promise<Room> {
 /**
  * Joins a room by code (or pasted invite link). Resolves with a live link
  * once the host has accepted our hello; rejects with a NetError otherwise.
+ * `spectate`: as the room's spectator, who only receives the match.
  */
-export async function joinRoom(codeOrUrl: string, signal?: AbortSignal): Promise<Link> {
+export async function joinRoom(codeOrUrl: string, signal?: AbortSignal, spectate = false): Promise<Link> {
     const code = codeFromText(codeOrUrl);
     if (!code) throw new NetError('notFound', 'code invalide');
     const peer = await openPeer(undefined);
@@ -429,10 +460,12 @@ export async function joinRoom(codeOrUrl: string, signal?: AbortSignal): Promise
             };
             conn.on('data', onData);
             conn.once('close', () => { clearTimeout(timer); reject(new NetError('peerGone')); });
-            conn.send(encode({ type: 'hello', v: PROTOCOL_VERSION, name: 'J2', b: buildFingerprint() }));
+            const hello: NetMsg = { type: 'hello', v: PROTOCOL_VERSION, name: spectate ? 'SPECTATEUR' : 'J2', b: buildFingerprint() };
+            if (spectate) hello.spec = true;
+            conn.send(encode(hello));
         });
         if (!ack.ok || ack.v !== PROTOCOL_VERSION) {
-            throw new NetError(ack.reason === 'full' ? 'full' : 'version');
+            throw new NetError(ack.reason === 'full' ? 'full' : ack.reason === 'specFull' ? 'specFull' : 'version');
         }
         signal?.removeEventListener('abort', abort);
         // The broker has done its job; keep the WebRTC connection only.

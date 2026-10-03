@@ -18,7 +18,7 @@
 import { stepMatch } from '../engine/match';
 import { BTN, type GameEvent, type MatchState } from '../engine/types';
 import { checksum, cloneState } from './checksum';
-import type { NetMsg } from './protocol';
+import { packPair, type NetMsg } from './protocol';
 
 export interface RollbackOptions {
     /** Frames between pressing a button and the game using it (default 2). */
@@ -168,6 +168,20 @@ export class RollbackSession {
             const l = this.localInputs[f] ?? 0;
             const r = this.remoteInputs[f] ?? 0;
             out.push(this.localSide === 0 ? [l, r] : [r, l]);
+        }
+        return out;
+    }
+
+    /**
+     * Inputs of frames `from .. to - 1` (confirmed frames only), both players
+     * packed per frame as in a `watch` message: what a spectator replays.
+     */
+    confirmedInputs(from: number, to = this._confirmedFrame): number[] {
+        const out: number[] = [];
+        for (let f = Math.max(0, from); f < Math.min(to, this._confirmedFrame); f++) {
+            const l = this.localInputs[f] ?? 0;
+            const r = this.remoteInputs[f] ?? 0;
+            out.push(this.localSide === 0 ? packPair(l, r) : packPair(r, l));
         }
         return out;
     }
