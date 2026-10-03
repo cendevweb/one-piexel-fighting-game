@@ -96,7 +96,7 @@ export function roundPips(ctx: CanvasRenderingContext2D, n: number, right: numbe
 
 /** A button glyph: the letter in a coloured box. */
 export function buttonGlyph(ctx: CanvasRenderingContext2D, letter: string, x: number, y: number): number {
-    const colors: Record<string, string> = { A: '#4c9aff', B: '#ff5a3c', C: '#ffd23f' };
+    const colors: Record<string, string> = { A: '#4c9aff', B: '#ff5a3c', C: '#ffd23f', U: '#c77dff' };
     ctx.fillStyle = colors[letter] ?? '#888';
     ctx.fillRect(x, y - 2, 11, 11);
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -106,14 +106,15 @@ export function buttonGlyph(ctx: CanvasRenderingContext2D, letter: string, x: nu
 }
 
 /**
- * Inline notation: text in which [A] [B] [C] become button glyphs.
+ * Inline notation: text in which [A] [B] [C] (and [U], the ultimate key)
+ * become button glyphs.
  * Returns the width drawn.
  */
 export function notation(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color = '#ffffff'): number {
     let cx = x;
-    for (const part of text.split(/(\[[ABC]\])/)) {
+    for (const part of text.split(/(\[[ABCU]\])/)) {
         if (!part) continue;
-        const m = part.match(/^\[([ABC])\]$/);
+        const m = part.match(/^\[([ABCU])\]$/);
         if (m) cx += buttonGlyph(ctx, m[1], cx, y);
         else {
             drawText(ctx, part, cx, y, { color, outline: COLORS.ink });

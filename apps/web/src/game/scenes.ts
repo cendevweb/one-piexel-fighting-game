@@ -14,6 +14,7 @@ import { STAGES, stageImage } from '../render/stage';
 import { settings } from '../settings';
 import { Cpu, LEVELS, LEVEL_NAMES, dummyBits, type DummyMode } from './ai';
 import { OptionList, type App, type Scene } from './app';
+import { InputLog, entryLabel } from './inputLog';
 import { SettingsScene } from './settingsScene';
 import { COLORS, hint, menuBackdrop, menuItems, notation, panel, title } from './ui';
 
@@ -533,6 +534,8 @@ export class FightScene implements Scene {
     private endT = 0;
     private dummy: DummyMode = 'stand';
     private boxes = false;
+    private showInputs = true;
+    private inputLog = new InputLog();
     private t = 0;
 
     constructor(private app: App, private setup: Setup) {
@@ -558,7 +561,7 @@ export class FightScene implements Scene {
     private pauseItems(): string[] {
         if (this.setup.mode === 'training') {
             const names: Record<DummyMode, string> = { stand: 'DEBOUT', crouch: 'ACCROUPI', guard: 'GARDE', jump: 'SAUTE', cpu: 'ORDINATEUR' };
-            return ['REPRENDRE', 'LISTE DES COUPS', `MANNEQUIN : ${names[this.dummy]}`, `BOÎTES : ${this.boxes ? 'OUI' : 'NON'}`, `JAUGE D'ULTIME : ${this.state.fullMeter !== false ? 'PLEINE' : 'NORMALE'}`, 'OPTIONS', 'CHANGER DE PERSONNAGES', 'MENU PRINCIPAL'];
+            return ['REPRENDRE', 'LISTE DES COUPS', `MANNEQUIN : ${names[this.dummy]}`, `BOÎTES : ${this.boxes ? 'OUI' : 'NON'}`, `INPUTS : ${this.showInputs ? 'OUI' : 'NON'}`, `JAUGE D'ULTIME : ${this.state.fullMeter !== false ? 'PLEINE' : 'NORMALE'}`, 'OPTIONS', 'CHANGER DE PERSONNAGES', 'MENU PRINCIPAL'];
         }
         return ['REPRENDRE', 'LISTE DES COUPS', 'RECOMMENCER', 'OPTIONS', 'MENU PRINCIPAL'];
     }
@@ -592,6 +595,7 @@ export class FightScene implements Scene {
             else if (side === 0) inputs[side] = readSolo() & ~BTN.start;
         }
         endInputTick();
+        if (this.setup.mode === 'training') this.inputLog.push(inputs[0], this.state.fighters[0].facing);
         // Dev only: the inputs and state, for the end-to-end input checks.
         if (import.meta.env.DEV) (window as unknown as { __opfgFight?: unknown }).__opfgFight = { inputs, state: this.state };
         const events = stepMatch(this.state, inputs);
@@ -633,6 +637,9 @@ export class FightScene implements Scene {
         } else if (item.startsWith('BOÎTES')) {
             this.boxes = !this.boxes;
             this.view.options.showBoxes = this.boxes;
+        } else if (item.startsWith('INPUTS')) {
+            this.showInputs = !this.showInputs;
+            this.inputLog.clear();
         } else if (item.startsWith('JAUGE')) {
             // Normal: both meters start empty and fill as in a real fight.
             this.state.fullMeter = this.state.fullMeter === false;
@@ -669,6 +676,26 @@ export class FightScene implements Scene {
         drawText(ctx, `COMBO ${d.combo}  DÉGÂTS ${d.comboDamage}`, 320, 52, { color: '#fff', align: 'center' });
         drawText(ctx, moveLine, 320, 64, { color: COLORS.gold, align: 'center' });
         drawText(ctx, 'ÉCHAP : PAUSE / OPTIONS', 320, 330, { color: '#cfc4dc', outline: COLORS.ink, align: 'center' });
+        if (this.showInputs) this.drawInputLog(ctx);
+    }
+
+    /** J1's inputs, newest on top, under the combo counter on the left. */
+    private drawInputLog(ctx: CanvasRenderingContext2D): void {
+        const entries = this.inputLog.entries;
+        if (!entries.length) return;
+        const x = 6;
+        const y = 176;
+        const row = 12;
+        ctx.fillStyle = 'rgba(8,4,16,0.55)';
+        ctx.fillRect(x - 2, y - 4, 82, entries.length * row + 4);
+        entries.forEach((e, i) => {
+            const ry = y + i * row;
+            // Older lines fade a little so the newest one reads first.
+            ctx.globalAlpha = i === 0 ? 1 : Math.max(0.45, 0.9 - i * 0.04);
+            drawText(ctx, String(e.frames).padStart(2, ' '), x + 12, ry, { color: COLORS.dim, outline: COLORS.ink, align: 'right' });
+            notation(ctx, entryLabel(e), x + 18, ry, '#ffffff');
+        });
+        ctx.globalAlpha = 1;
     }
 
     private drawMoveList(ctx: CanvasRenderingContext2D, c: CharacterDef): void {
