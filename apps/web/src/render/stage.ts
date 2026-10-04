@@ -34,7 +34,7 @@ export const STAGES: StageDef[] = [
     { id: 'arlong-park', name: 'Arlong Park', floor: ['#7a5d44', '#a07c5a', '#4f3a28'], pattern: 'planks', ambient: 'spray', dim: 0.3 },
     { id: 'rain-dinners', name: 'Rain Dinners', floor: ['#e3d8ae', '#f4eccb', '#bfae7c'], pattern: 'sand', ambient: 'dust', dim: 0.3 },
     { id: 'enies-lobby', name: 'Enies Lobby', floor: ['#b99a6b', '#d4b784', '#8c7048'], pattern: 'stone', ambient: 'birds', dim: 0.3 },
-    { id: 'shandora', name: 'Shandora', floor: ['#6e7a4d', '#8d9a64', '#4c5634'], pattern: 'moss', ambient: 'leaves', dim: 0.3 },
+    { id: 'shandora', name: 'Shandora', floor: ['#ad9862', '#c9b47c', '#6f6238'], pattern: 'moss', ambient: 'leaves', dim: 0.3 },
     { id: 'impel-down', name: 'Impel Down', floor: ['#4d525c', '#6c727e', '#30343b'], pattern: 'grate', ambient: 'embers', dim: 0.3 }
 ];
 
@@ -143,7 +143,8 @@ export class StageRenderer {
         }
         if (this.def.pattern === 'sand' || this.def.pattern === 'moss') {
             // Speckles that scroll with the floor.
-            ctx.fillStyle = this.def.pattern === 'sand' ? dark : light;
+            // Sand gets darker grains, the ruins' paving tufts of grass.
+            ctx.fillStyle = this.def.pattern === 'sand' ? dark : '#6f8f3a';
             for (let i = 0; i < 90; i++) {
                 const wx = (i * 97.3) % this.stageWidth;
                 const row = (i * 37) % 23;
