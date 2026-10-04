@@ -105,6 +105,8 @@ export interface ProjectileDef {
     /** How many hits the projectile can deal before vanishing. */
     hits?: number;
     fps?: number;
+    /** Drawing scale of the sprite (the box is set on its own). */
+    scale?: number;
 }
 
 export type MoveKind = 'normal' | 'special' | 'ultimate' | 'throw';

@@ -523,7 +523,8 @@ function koCheck(state: MatchState, d: FighterState, events: GameEvent[]): void 
     events.push({ type: 'ko', side: d.side });
 }
 
-interface HitSource { x: number; facing: 1 | -1; side: number; kind: string }
+/** `guardX`, when set, is where the blow is guarded from (default `x`). */
+interface HitSource { x: number; facing: 1 | -1; side: number; kind: string; guardX?: number }
 
 function connect(
     state: MatchState, attacker: FighterState, src: HitSource, d: FighterState, hit: Omit<HitDef, 'frames' | 'box'>,
@@ -531,15 +532,17 @@ function connect(
 ): 'hit' | 'block' {
     const heavy = hit.damage >= 60;
     const stop = hit.hitstop ?? (heavy ? 11 : 7);
-    if (canBlock(d, hit, src.x)) {
+    if (canBlock(d, hit, src.guardX ?? src.x)) {
         const chip = src.kind === 'special' || src.kind === 'ultimate' ? Math.floor(hit.damage / 6) : 0;
         d.health -= chip;
         d.redHealth = Math.min(d.redHealth, d.health + chip);
-        const g = guardDir(d, src.x);
+        const g = guardDir(d, src.guardX ?? src.x);
         d.crouching = g === 'crouch';
         setMode(d, 'blockstun', hit.blockstun);
         setAnim(d, d.crouching ? 'guardLow' : 'guard');
         d.guard -= Math.floor(hit.damage / 3) + 4;
+        // A guarded ultimate wears the guard down but never breaks it.
+        if (src.kind === 'ultimate') d.guard = Math.max(1, d.guard);
         d.guardRest = 0;
         gainMeter(d, 3);
         gainMeter(attacker, 2);
@@ -650,7 +653,10 @@ function resolveAttacks(state: MatchState, a: FighterState, d: FighterState, eve
         a.hitMask |= bit;
         a.lastHitT = a.t;
         a.connected = true;
-        connect(state, a, { x: a.x, facing: a.facing, side: a.side, kind: move.kind }, d, hit, centre(box, hurt), events, false);
+        // A move that dashes through the foe is guarded the way it set off,
+        // not from wherever the attacker has got to: no unblockable cross-up.
+        const guardX = move.passThrough ? d.x - a.facing * PX : a.x;
+        connect(state, a, { x: a.x, guardX, facing: a.facing, side: a.side, kind: move.kind }, d, hit, centre(box, hurt), events, false);
     });
 }
 
@@ -690,6 +696,13 @@ function stepProjectiles(state: MatchState, events: GameEvent[]): void {
         const box = worldBoxAt(p.x, p.y, p.facing, def.box);
         const hurt = hurtBoxes(d).map((r) => worldBox(d, r)).find((h) => overlap(box, h));
         if (!hurt) continue;
+        // An ultimate is never interrupted by a projectile: it vanishes.
+        if (d.mode === 'move' && moveOf(d)?.kind === 'ultimate') {
+            p.dead = true;
+            const c = centre(box, hurt);
+            events.push({ type: 'hit', x: c.x, y: c.y, attacker: p.owner, spark: 'big', damage: 0, counter: false, heavy: true, shake: 2 });
+            continue;
+        }
         p.lastHit = p.t;
         p.hitsLeft--;
         if (p.hitsLeft <= 0) p.dead = true;

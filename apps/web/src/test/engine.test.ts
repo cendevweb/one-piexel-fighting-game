@@ -178,6 +178,31 @@ describe('engine', () => {
         }
     });
 
+    it('a projectile cannot interrupt an ultimate: it vanishes against it instead', () => {
+        for (const [p1, slot, input] of [['crocodile', 'specialB', left | special], ['magellan', 'specialF', right | special]] as const) {
+            // Sanji's ultimate has no invincibility to hide behind.
+            const s = fight(p1, 'sanji');
+            s.fighters[0].x = s.fighters[1].x - 120 * PX;
+            s.fighters[1].meter = 100;
+            stepMatch(s, [input, 0]);
+            stepMatch(s, [0, 0]);
+            expect(s.fighters[0].move).toBe(slot);
+            let t = 0;
+            while (!s.projectiles.length && t++ < 60) stepMatch(s, [0, 0]);
+            // Sanji answers with his ultimate as the projectile closes in.
+            while (s.projectiles.length && Math.abs(s.projectiles[0].x - s.fighters[1].x) > 75 * PX && t++ < 200) stepMatch(s, [0, 0]);
+            stepMatch(s, [0, heavy | special]);
+            expect(s.fighters[1].move).toBe('ultimate');
+            expect(s.projectiles.length).toBe(1);
+            let interrupted = false;
+            for (let i = 0; i < 120; i++) {
+                for (const e of stepMatch(s, [0, 0])) if (e.type === 'hit' && e.attacker === 0 && e.damage > 0) interrupted = true;
+                if (s.fighters[1].move !== 'ultimate') break;
+            }
+            expect(interrupted).toBe(false);
+        }
+    });
+
     it('a one-tick tap made entirely during hitstop still chains', () => {
         const s = fight();
         closeIn(s);

@@ -287,8 +287,9 @@ export class FightView {
             const n = Math.max(1, (getChar(p.char).manifest.anims[def.anim]?.frames.length ?? 1));
             const x = p.x / PX;
             const y = GROUND_Y - p.y / PX;
-            drawFrame(ctx, p.char, def.anim, Math.floor(p.t / per) % n, x, y, p.facing);
-            drawFrame(ctx, p.char, def.anim, Math.floor(p.t / per) % n, x, y, p.facing, { additive: true, alpha: 0.35 });
+            const scale = def.scale ?? 1;
+            drawFrame(ctx, p.char, def.anim, Math.floor(p.t / per) % n, x, y, p.facing, { scale });
+            drawFrame(ctx, p.char, def.anim, Math.floor(p.t / per) % n, x, y, p.facing, { scale, additive: true, alpha: 0.35 });
         }
         this.vfx.draw(ctx);
         if (this.options.showBoxes) this.drawBoxes(ctx);

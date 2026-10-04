@@ -47,6 +47,16 @@ const press = (input: number, n: number, held = 0) => [input, ...holdFor(held, n
 const mash = (input: number, n: number, held = 0) => Array.from({ length: n }, (_, i) => (i % 2 ? held : input | held));
 const unique = (xs: string[]) => xs.filter((x, i) => xs.indexOf(x) === i);
 
+describe('Doku Fugu', () => {
+    it('is 20% smaller than it was (box and sprite) and hits twice at most', () => {
+        const p = getChar('magellan').moves.specialF.projectile!;
+        expect(p.box[2]).toBeLessThanOrEqual(36);
+        expect(p.box[3]).toBeLessThanOrEqual(36);
+        expect(p.scale).toBe(0.8);
+        expect(p.hits).toBeLessThanOrEqual(2);
+    });
+});
+
 for (const foe of ['luffy', 'akainu']) {
     describe(`Magellan vs ${foe}`, () => {
         it('lightA → lightB → lightC connects all three', () => {
@@ -150,6 +160,20 @@ for (const foe of ['luffy', 'akainu']) {
             const log = play(s, [right | special, ...holdFor(0, 80)]);
             expect(log.hits.filter((h) => h === 'specialF').length).toBeGreaterThanOrEqual(2);
             expect(s.fighters[1].health).toBeLessThan(getChar(foe).health);
+        });
+
+        it('Doku Fugu blocked leaves Magellan open to a punish', () => {
+            const s = fight(foe);
+            place(s, 40);
+            let lastBlock = -1;
+            let free = -1;
+            for (let t = 0; t < 160; t++) {
+                for (const e of stepMatch(s, [t === 0 ? right | special : 0, right])) if (e.type === 'block' && e.attacker === 0) lastBlock = t;
+                if (t > 0 && free < 0 && s.fighters[0].mode !== 'move') free = t;
+            }
+            expect(lastBlock).toBeGreaterThan(0);
+            // Magellan is still recovering well after the bomb's last blocked hit.
+            expect(free - lastBlock).toBeGreaterThanOrEqual(14);
         });
 
         it('Doku Gumo (↓S) hits several times then knocks down', () => {
