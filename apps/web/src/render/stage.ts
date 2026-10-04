@@ -7,6 +7,16 @@ import stageMeta from '../generated/stages.json';
  */
 
 export const GROUND_Y = 158;
+/** Top edge of the floor, camera at rest. */
+const FLOOR_TOP = GROUND_Y - 10;
+
+interface StageMeta {
+    /** Line of the painting pinned on the floor's top edge (fraction of its height). */
+    horizon: number;
+    sky: string;
+}
+
+const META = stageMeta as Record<string, StageMeta>;
 
 export interface StageDef {
     id: string;
@@ -22,7 +32,7 @@ export interface StageDef {
 export const STAGES: StageDef[] = [
     { id: 'marineford', name: 'Marineford', floor: ['#9aa2ad', '#c8ced6', '#6b7380'], pattern: 'tiles', ambient: 'spray', dim: 0.3 },
     { id: 'arlong-park', name: 'Arlong Park', floor: ['#7a5d44', '#a07c5a', '#4f3a28'], pattern: 'planks', ambient: 'spray', dim: 0.3 },
-    { id: 'rain-dinners', name: 'Rain Dinners', floor: ['#dcc58d', '#efdcaa', '#b79f68'], pattern: 'sand', ambient: 'dust', dim: 0.3 },
+    { id: 'rain-dinners', name: 'Rain Dinners', floor: ['#e3d8ae', '#f4eccb', '#bfae7c'], pattern: 'sand', ambient: 'dust', dim: 0.3 },
     { id: 'enies-lobby', name: 'Enies Lobby', floor: ['#b99a6b', '#d4b784', '#8c7048'], pattern: 'stone', ambient: 'birds', dim: 0.3 },
     { id: 'shandora', name: 'Shandora', floor: ['#6e7a4d', '#8d9a64', '#4c5634'], pattern: 'moss', ambient: 'leaves', dim: 0.3 },
     { id: 'impel-down', name: 'Impel Down', floor: ['#4d525c', '#6c727e', '#30343b'], pattern: 'grate', ambient: 'embers', dim: 0.3 }
@@ -42,6 +52,23 @@ export function loadStage(id: string): Promise<void> {
 
 export const stageImage = (id: string) => images.get(id);
 
+/** The backdrop cropped to fill a w×h box without stretching, its horizon
+ *  near the bottom as in a fight. */
+export function drawStageThumb(ctx: CanvasRenderingContext2D, id: string, x: number, y: number, w: number, h: number): void {
+    const img = images.get(id);
+    if (!img) return;
+    let sw = img.width;
+    let sh = (img.width * h) / w;
+    if (sh > img.height) {
+        sh = img.height;
+        sw = (img.height * w) / h;
+    }
+    const sx = (img.width - sw) / 2;
+    const horizon = (META[id]?.horizon ?? 1) * img.height;
+    const sy = Math.max(0, Math.min(img.height - sh, horizon - sh * 0.9));
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
 interface Mote { x: number; y: number; vx: number; vy: number; life: number; size: number; phase: number }
 
 export class StageRenderer {
@@ -59,14 +86,16 @@ export class StageRenderer {
     /** camX: world x of the screen's left edge. */
     drawBack(ctx: CanvasRenderingContext2D, camX: number, camY: number, t: number, darken = 0): void {
         const img = images.get(this.def.id);
-        const meta = (stageMeta as Record<string, { sky: string; horizon: string }>)[this.def.id];
+        const meta = META[this.def.id];
         ctx.fillStyle = meta?.sky ?? '#3a8ee6';
         ctx.fillRect(0, 0, 320, 180);
         if (img) {
-            // The backdrop is 440 world px wide and scrolls at half speed.
+            // The backdrop is 440 world px wide and scrolls at half speed;
+            // its horizon sits just under the floor's dark top edge, and the
+            // camera lifting on high jumps uncovers a little more below it.
             const range = this.stageWidth - 320;
             const bx = -((camX / Math.max(1, range)) * (img.width / 2 - 320));
-            const by = GROUND_Y - 10 - img.height / 2 + 3 - camY * 0.5;
+            const by = FLOOR_TOP + 3 - (meta?.horizon ?? 1) * (img.height / 2) - camY * 0.5;
             ctx.drawImage(img, Math.round(bx * 2) / 2, Math.round(by * 2) / 2, img.width / 2, img.height / 2);
         }
         const dim = this.def.dim + darken;
@@ -80,7 +109,7 @@ export class StageRenderer {
 
     private drawFloor(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
         const [base, light, dark] = this.def.floor;
-        const top = GROUND_Y - 10 - camY;
+        const top = FLOOR_TOP - camY;
         ctx.fillStyle = base;
         ctx.fillRect(0, top, 320, 180 - top);
         // A dark edge where the floor meets the backdrop.
