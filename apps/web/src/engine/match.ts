@@ -541,10 +541,10 @@ function connect(
         setMode(d, 'blockstun', hit.blockstun);
         setAnim(d, d.crouching ? 'guardLow' : 'guard');
         d.guard -= Math.floor(hit.damage / 3) + 4;
-        // A guarded ultimate wears the guard down but never breaks it,
-        // unless the blow is made to break it.
+        // A blow made to break the guard empties it outright. Any other blow,
+        // an ultimate's included, breaks it once the gauge runs out: the
+        // ultimate's remaining hits then land on the dizzy foe.
         if (hit.guardBreak) d.guard = 0;
-        else if (src.kind === 'ultimate') d.guard = Math.max(1, d.guard);
         d.guardRest = 0;
         gainMeter(d, 3);
         gainMeter(attacker, 2);
