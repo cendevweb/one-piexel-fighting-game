@@ -160,13 +160,14 @@ export const crocodile: CharacterDef = {
             // Sables (←S): the cape swirls and a sand tornado crawls forward,
             // lifting the foe and hitting again and again.
             name: 'Sables', anim: 'specialB', kind: 'special', stance: 'stand',
-            durations: [8, 6, 6, 8, 10, 20],
+            // Two hits that keep the foe on his feet: no knockdown to loop on.
+            durations: [8, 6, 6, 8, 10, 26],
             fx: [[2, 'fx_tornadoSmall', 40, 0, 'sand']],
             hits: [],
             projectile: {
-                anim: 'fx_sables', atFrame: 3, offset: [24, 0], speed: 1.4, life: 110,
-                box: [-40, 0, 80, 112], fps: 15, hits: 3,
-                hit: { damage: 40, guard: 'mid', hitstun: 30, blockstun: 12, push: 1, launch: [0.2, 3.4], hitstop: 5, spark: 'sand', shake: 3, sfx: 'sand' }
+                anim: 'fx_sables', atFrame: 3, offset: [24, 0], speed: 1.4, life: 70,
+                box: [-40, 0, 80, 112], fps: 15, hits: 2,
+                hit: { damage: 45, guard: 'mid', hitstun: 22, blockstun: 12, push: 4, hitstop: 5, spark: 'sand', shake: 3, sfx: 'sand' }
             },
             sfx: 'sand'
         },

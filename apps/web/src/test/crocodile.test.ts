@@ -152,10 +152,38 @@ describe.each(['luffy', 'akainu'])('Crocodile vs %s', (foe) => {
         step(s, BTN.left, 0, log);
         expect(s.fighters[0].move).toBe('specialB');
         hold(s, 0, 0, 220, log);
-        expect(log.hits.length).toBeGreaterThanOrEqual(3);
+        expect(log.hits.length).toBe(2);
         expect(hp - s.fighters[1].health).toBeGreaterThanOrEqual(80);
         expect(hp - s.fighters[1].health).toBeLessThan(200);
         expect(log.events.some((e) => e.type === 'superFreeze')).toBe(false);
+    });
+
+    it('spamming ←S cannot loop Sables: a tornado never combos into the next one', () => {
+        const s = fight(foe);
+        pointBlank(s, 30);
+        const hp = s.fighters[1].health;
+        const log = newLog();
+        // Presses ←S every other tick for ten seconds.
+        for (let t = 0; t < 600; t++) step(s, t % 2 ? BTN.left : BTN.left | special, 0, log);
+        expect(log.hits.length).toBeGreaterThan(0);
+        expect(log.maxCombo).toBeLessThanOrEqual(2);
+        expect(s.fighters[1].health).toBeLessThan(hp);
+    });
+
+    it('after a Sables knockdown the foe gets up and guards the next tornado', () => {
+        const s = fight(foe);
+        pointBlank(s, 30);
+        const log = newLog();
+        let up = false;
+        let hpUp = 0;
+        for (let t = 0; t < 600; t++) {
+            const d = s.fighters[1];
+            if (!up && log.hits.length && (d.mode === 'idle' || d.mode === 'walk')) { up = true; hpUp = d.health; }
+            // Once back on his feet P2 holds back (→, he stands on the right).
+            step(s, t % 2 ? BTN.left : BTN.left | special, up ? right : 0, log);
+        }
+        expect(up).toBe(true);
+        expect(hpUp - s.fighters[1].health).toBeLessThan(60);
     });
 
     const pesado = (foe: string) => {

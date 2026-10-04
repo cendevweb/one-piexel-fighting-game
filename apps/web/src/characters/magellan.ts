@@ -119,11 +119,11 @@ export const magellan: CharacterDef = {
         },
         specialF: {
             name: 'Doku Fugu', anim: 'specialF', kind: 'special', stance: 'stand',
-            durations: [2, 3, 2, 2, 2, 2, 4, 8, 12],
+            durations: [2, 3, 2, 2, 2, 2, 4, 10, 22],
             hits: [],
             projectile: {
-                anim: 'fx_fugu', atFrame: 6, offset: [44, 50], speed: 2.6, life: 80,
-                box: [-22, -22, 44, 44], fps: 10, hits: 3,
+                anim: 'fx_fugu', atFrame: 6, offset: [44, 46], speed: 2.6, life: 70,
+                box: [-18, -18, 35, 35], fps: 10, hits: 2, scale: 0.8,
                 hit: { damage: 32, guard: 'mid', hitstun: 20, blockstun: 12, push: 6, hitstop: 7, spark: 'poison', sfx: 'poison' }
             },
             sfx: 'poison'

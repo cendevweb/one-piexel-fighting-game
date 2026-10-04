@@ -199,6 +199,31 @@ for (const foe of ['luffy', 'akainu']) {
             expect(s.fighters[1].y).toBeGreaterThan(0);
         });
 
+        it('Sanzen Sekai can be guarded: holding back blocks it, even once Zoro is through', () => {
+            for (const gap of [4, 150]) {
+                const s = fight(foe);
+                place(s, gap);
+                s.fighters[0].meter = 100;
+                const hp = s.fighters[1].health;
+                // P2 stands on the right: holding → is holding back.
+                const log = play(s, [heavy | special, ...holdFor(0, 260)], right);
+                expect(log.hits).toEqual([]);
+                expect(log.blocks).toBeGreaterThanOrEqual(1);
+                expect(hp - s.fighters[1].health).toBeLessThan(80);
+            }
+        });
+
+        it('Kyūtōryū Ashura can be guarded too', () => {
+            const s = fight(foe);
+            place(s);
+            s.fighters[0].meter = 200;
+            const hp = s.fighters[1].health;
+            const log = play(s, [light | heavy | special, ...holdFor(0, 320)], right);
+            expect(log.hits).toEqual([]);
+            expect(log.blocks).toBeGreaterThanOrEqual(1);
+            expect(hp - s.fighters[1].health).toBeLessThan(140);
+        });
+
         it('Sanzen Sekai dashes through from far away and lands Zoro behind', () => {
             const s = fight(foe);
             place(s, 150);
@@ -212,6 +237,17 @@ for (const foe of ['luffy', 'akainu']) {
 
 describe('Zoro staging', () => {
     const z = getChar('zoro');
+
+    it('uses the same hit, guard and swing sounds as everyone: no sword clash of his own', () => {
+        const own = ['iai', 'whirl', 'slash', 'slashHeavy'];
+        for (const m of Object.values(z.moves)) {
+            if (!m) continue;
+            expect(own).not.toContain(m.sfx);
+            for (const h of m.hits) expect(own).not.toContain(h.sfx);
+            if (m.projectile) expect(own).not.toContain(m.projectile.hit.sfx);
+            for (const fx of m.fx ?? []) expect(own).not.toContain(fx[4]);
+        }
+    });
 
     it('announces both ultimates with the usual band only, no extra cut-in art', () => {
         expect(Object.keys(z.manifest.images).sort()).toEqual(['art', 'cutin', 'face', 'portrait']);
