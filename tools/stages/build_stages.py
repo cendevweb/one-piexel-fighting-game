@@ -8,10 +8,6 @@ speed behind the fighters and pins its horizon line on the top edge of the
 floor it draws itself (render/stage.ts). The floor the fighters stand on is
 never taken from the image, so their feet do not slide over a backdrop that
 scrolls slower than they do.
-
-A portrait source (941×1672, the first generation of paintings) is still
-accepted: it is cropped to the full-width band that ends at its horizon,
-which then sits at the bottom of the backdrop.
 """
 import json
 import os
@@ -28,8 +24,6 @@ OUT = os.path.join(ROOT, "apps", "web", "public", "stages")
 # pixels, 120 more than the screen, the scroll for the 240 px the camera
 # travels across the stage.
 WIDTH = 880
-# Height of a backdrop cut from a portrait source.
-PORTRAIT_HEIGHT = 380
 
 # The line of the painting that meets the floor, as a fraction of its
 # height: a little below the foot of the landmark, so a strip of sea, sand
@@ -41,10 +35,6 @@ HORIZON = {
     "rain-dinners": 0.795,
     "shandora": 0.82,
     "marineford": 0.93,
-}
-# Portrait sources only: same thing, in the first-generation paintings.
-PORTRAIT_HORIZON = {
-    "shandora": 0.60,
 }
 
 
@@ -66,12 +56,6 @@ def main() -> None:
     for name, horizon in HORIZON.items():
         src = Image.open(source(name)).convert("RGB")
         W, H = src.size
-        if H > W:
-            band = round(W * PORTRAIT_HEIGHT / WIDTH)
-            bottom = int(H * PORTRAIT_HORIZON[name])
-            src = src.crop((0, bottom - band, W, bottom))
-            horizon = 1.0
-            W, H = src.size
         img = src.resize((WIDTH, round(H * WIDTH / W)), Image.LANCZOS)
         img.save(os.path.join(OUT, f"{name}.png"), optimize=True)
         a = np.asarray(img).astype(int)
