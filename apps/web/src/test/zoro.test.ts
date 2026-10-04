@@ -261,14 +261,11 @@ for (const foe of ['luffy', 'akainu']) {
 describe('Zoro staging', () => {
     const z = getChar('zoro');
 
-    it('uses the same hit, guard and swing sounds as everyone: no sword clash of his own', () => {
-        const own = ['iai', 'whirl', 'slash', 'slashHeavy'];
+    it('cuts with the same sword sounds as Shanks and Mihawk', () => {
+        const blade = ['slash', 'slashHeavy'];
         for (const m of Object.values(z.moves)) {
-            if (!m) continue;
-            expect(own).not.toContain(m.sfx);
-            for (const h of m.hits) expect(own).not.toContain(h.sfx);
-            if (m.projectile) expect(own).not.toContain(m.projectile.hit.sfx);
-            for (const fx of m.fx ?? []) expect(own).not.toContain(fx[4]);
+            if (!m || (m.kind !== 'normal' && m.kind !== 'special')) continue;
+            expect(blade).toContain(m.sfx);
         }
     });
 
