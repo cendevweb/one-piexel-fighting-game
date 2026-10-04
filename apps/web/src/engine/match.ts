@@ -533,7 +533,7 @@ function connect(
     const heavy = hit.damage >= 60;
     const stop = hit.hitstop ?? (heavy ? 11 : 7);
     if (canBlock(d, hit, src.guardX ?? src.x)) {
-        const chip = src.kind === 'special' || src.kind === 'ultimate' ? Math.floor(hit.damage / 6) : 0;
+        const chip = !hit.guardBreak && (src.kind === 'special' || src.kind === 'ultimate') ? Math.floor(hit.damage / 6) : 0;
         d.health -= chip;
         d.redHealth = Math.min(d.redHealth, d.health + chip);
         const g = guardDir(d, src.guardX ?? src.x);
@@ -541,8 +541,10 @@ function connect(
         setMode(d, 'blockstun', hit.blockstun);
         setAnim(d, d.crouching ? 'guardLow' : 'guard');
         d.guard -= Math.floor(hit.damage / 3) + 4;
-        // A guarded ultimate wears the guard down but never breaks it.
-        if (src.kind === 'ultimate') d.guard = Math.max(1, d.guard);
+        // A guarded ultimate wears the guard down but never breaks it,
+        // unless the blow is made to break it.
+        if (hit.guardBreak) d.guard = 0;
+        else if (src.kind === 'ultimate') d.guard = Math.max(1, d.guard);
         d.guardRest = 0;
         gainMeter(d, 3);
         gainMeter(attacker, 2);
