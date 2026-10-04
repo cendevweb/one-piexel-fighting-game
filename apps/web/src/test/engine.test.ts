@@ -178,6 +178,39 @@ describe('engine', () => {
         }
     });
 
+    it('a guarded ultimate breaks the guard once the gauge runs out', () => {
+        // Full guard: the Kamusari breaks it on its last slash, no damage beyond chip.
+        const s = fight('shanks', 'luffy');
+        s.fighters[0].x = s.fighters[1].x - 60 * PX;
+        s.fighters[0].meter = 100;
+        let crushed = false;
+        let hits = 0;
+        for (let i = 0; i < 200; i++) {
+            for (const e of stepMatch(s, [i === 0 ? heavy | special : 0, right])) {
+                if (e.type === 'guardCrush' && e.side === 1) crushed = true;
+                if (e.type === 'hit' && e.attacker === 0) hits++;
+            }
+        }
+        expect(crushed).toBe(true);
+        expect(hits).toBe(0);
+
+        // Half-empty guard: the first slash breaks it and the second one lands.
+        const s2 = fight('shanks', 'luffy');
+        s2.fighters[0].x = s2.fighters[1].x - 60 * PX;
+        s2.fighters[0].meter = 100;
+        s2.fighters[1].guard = 30;
+        const hp = s2.fighters[1].health;
+        let crushed2 = false;
+        for (let i = 0; i < 200; i++) {
+            for (const e of stepMatch(s2, [i === 0 ? heavy | special : 0, right])) {
+                if (e.type === 'guardCrush' && e.side === 1) crushed2 = true;
+            }
+        }
+        expect(crushed2).toBe(true);
+        // More than the 18 chip of the guarded first slash.
+        expect(hp - s2.fighters[1].health).toBeGreaterThan(40);
+    });
+
     it('a projectile cannot interrupt an ultimate: it vanishes against it instead', () => {
         for (const [p1, slot, input] of [['crocodile', 'specialB', left | special], ['magellan', 'specialF', right | special]] as const) {
             // Sanji's ultimate has no invincibility to hide behind.

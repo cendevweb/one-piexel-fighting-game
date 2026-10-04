@@ -226,15 +226,25 @@ for (const foe of ['luffy', 'akainu']) {
             }
         });
 
-        it('Kyūtōryū Ashura can be guarded too', () => {
+        it('Kyūtōryū Ashura guarded wears the guard out, breaks it, then lands', () => {
             const s = fight(foe);
             place(s);
             s.fighters[0].meter = 200;
             const hp = s.fighters[1].health;
-            const log = play(s, [light | heavy | special, ...holdFor(0, 320)], right);
-            expect(log.hits).toEqual([]);
+            let crushed = -1;
+            const log: { hits: string[]; blocks: number } = { hits: [], blocks: 0 };
+            for (const input of [light | heavy | special, ...holdFor(0, 320)]) {
+                for (const e of stepMatch(s, [input, right])) {
+                    if (e.type === 'hit' && e.attacker === 0) log.hits.push(s.fighters[0].move ?? '?');
+                    if (e.type === 'block' && e.attacker === 0) log.blocks++;
+                    if (e.type === 'guardCrush' && e.side === 1 && crushed < 0) crushed = log.hits.length;
+                }
+            }
             expect(log.blocks).toBeGreaterThanOrEqual(1);
-            expect(hp - s.fighters[1].health).toBeLessThan(140);
+            // No hit before the guard gives way, and the rest of the ultimate lands.
+            expect(crushed).toBe(0);
+            expect(log.hits.length).toBeGreaterThan(0);
+            expect(hp - s.fighters[1].health).toBeGreaterThan(140);
         });
 
         it('Sanzen Sekai dashes through from far away and lands Zoro behind', () => {
