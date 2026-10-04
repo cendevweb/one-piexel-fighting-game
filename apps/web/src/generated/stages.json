@@ -1,26 +1,26 @@
 {
  "arlong-park": {
-  "sky": "#895653",
-  "horizon": "#625c5d"
+  "horizon": 0.785,
+  "sky": "#0370f4"
  },
  "enies-lobby": {
-  "sky": "#6eb8bc",
-  "horizon": "#537d7a"
+  "horizon": 0.885,
+  "sky": "#2890f9"
  },
  "impel-down": {
-  "sky": "#576471",
-  "horizon": "#578fb8"
+  "horizon": 0.875,
+  "sky": "#4a5d80"
  },
  "rain-dinners": {
-  "sky": "#4c859d",
-  "horizon": "#efe7b7"
+  "horizon": 0.795,
+  "sky": "#0074fd"
  },
  "shandora": {
-  "sky": "#7a8d53",
-  "horizon": "#637339"
+  "horizon": 1.0,
+  "sky": "#7a8d53"
  },
  "marineford": {
-  "sky": "#7a8f9b",
-  "horizon": "#355263"
+  "horizon": 0.93,
+  "sky": "#258af3"
  }
 }

@@ -1,13 +1,17 @@
-"""Turn the portrait backdrops into wide stage panoramas.
+"""Turn the stage paintings into the backdrops the game draws.
 
     python3 tools/stages/build_stages.py
 
-The source images are portrait (941×1672). A fighting stage is wide, so each
-one is cropped to the full-width band that ends at its horizon, scaled to the
-stage's backdrop size. Mirroring the image sideways to fill a wider band was
-tried and repeats the landmark, so the band is simply as wide as the image,
-and the top of tall landmarks is cut, as the HUD would cover it anyway. The
-floor the fighters stand on is drawn by the game, not taken from the image.
+Each source in assets/backgrounds/ is a 16:9 panorama (1672×941). It is
+kept whole and scaled to the backdrop width: the game scrolls it at half
+speed behind the fighters and pins its horizon line on the top edge of the
+floor it draws itself (render/stage.ts). The floor the fighters stand on is
+never taken from the image, so their feet do not slide over a backdrop that
+scrolls slower than they do.
+
+A portrait source (941×1672, the first generation of paintings) is still
+accepted: it is cropped to the full-width band that ends at its horizon,
+which then sits at the bottom of the backdrop.
 """
 import json
 import os
@@ -17,44 +21,70 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+SRC = os.path.join(ROOT, "assets", "backgrounds")
 OUT = os.path.join(ROOT, "apps", "web", "public", "stages")
 
-# Backdrop size in screen pixels at the game's 2× render scale.
-HEIGHT = 380
+# Backdrop width in screen pixels at the game's 2× render scale: 440 world
+# pixels, 120 more than the screen, the scroll for the 240 px the camera
+# travels across the stage.
 WIDTH = 880
+# Height of a backdrop cut from a portrait source.
+PORTRAIT_HEIGHT = 380
 
-# Where the horizon sits, as a fraction of the source height: the band
-# ends there.
+# The line of the painting that meets the floor, as a fraction of its
+# height: a little below the foot of the landmark, so a strip of sea, sand
+# or grass shows between the two.
 HORIZON = {
-    "arlong-park": 0.735,
-    "enies-lobby": 0.70,
-    "impel-down": 0.685,
-    "rain-dinners": 0.665,
-    "shandora": 0.60,
-    "marineford": 0.725,
+    "arlong-park": 0.785,
+    "enies-lobby": 0.885,
+    "impel-down": 0.875,
+    "rain-dinners": 0.795,
+    "shandora": 0.82,
+    "marineford": 0.93,
 }
+# Portrait sources only: same thing, in the first-generation paintings.
+PORTRAIT_HORIZON = {
+    "shandora": 0.60,
+}
+
+
+def source(name: str) -> str:
+    for ext in ("webp", "png"):
+        path = os.path.join(SRC, f"{name}.{ext}")
+        if os.path.exists(path):
+            return path
+    raise FileNotFoundError(f"no painting for {name} in {SRC}")
+
+
+def hexcolor(pixels: np.ndarray) -> str:
+    return "#%02x%02x%02x" % tuple(pixels.reshape(-1, 3).mean(axis=0).astype(int))
 
 
 def main() -> None:
     os.makedirs(OUT, exist_ok=True)
     meta = {}
-    for name, b in HORIZON.items():
-        src = Image.open(os.path.join(ROOT, "assets", "backgrounds", f"{name}.png")).convert("RGB")
+    for name, horizon in HORIZON.items():
+        src = Image.open(source(name)).convert("RGB")
         W, H = src.size
-        band = round(W * HEIGHT / WIDTH)
-        bottom = int(H * b)
-        crop = src.crop((0, bottom - band, W, bottom))
-        img = crop.resize((WIDTH, HEIGHT), Image.LANCZOS)
+        if H > W:
+            band = round(W * PORTRAIT_HEIGHT / WIDTH)
+            bottom = int(H * PORTRAIT_HORIZON[name])
+            src = src.crop((0, bottom - band, W, bottom))
+            horizon = 1.0
+            W, H = src.size
+        img = src.resize((WIDTH, round(H * WIDTH / W)), Image.LANCZOS)
         img.save(os.path.join(OUT, f"{name}.png"), optimize=True)
-        # Colours the game uses for its floor and sky, sampled from the image.
         a = np.asarray(img).astype(int)
         meta[name] = {
-            "sky": "#%02x%02x%02x" % tuple(a[:6].reshape(-1, 3).mean(axis=0).astype(int)),
-            "horizon": "#%02x%02x%02x" % tuple(a[-8:].reshape(-1, 3).mean(axis=0).astype(int)),
+            # Line pinned on the floor's top edge (fraction of the height).
+            "horizon": horizon,
+            # Fills whatever the backdrop leaves uncovered.
+            "sky": hexcolor(a[:6]),
         }
-        print(name, img.size)
+        print(name, img.size, meta[name])
     with open(os.path.join(ROOT, "apps", "web", "src", "generated", "stages.json"), "w") as f:
         json.dump(meta, f, indent=1)
+        f.write("\n")
 
 
 if __name__ == "__main__":

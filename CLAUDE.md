@@ -20,7 +20,7 @@ apps/web/src/game        Scènes (menus, sélection, combat, résultats), IA, sa
 apps/web/src/net         En ligne : protocole, rollback, transport WebRTC (peerjs).
 apps/web/src/settings.ts Réglages joueur (volumes, règles hors ligne, affichage), localStorage.
 tools/sprites            Extraction des planches → atlas + manifestes JSON.
-tools/stages             Découpe des décors.
+tools/stages             Mise à l'échelle des décors (+ ligne d'horizon).
 ```
 
 **`engine` décide, tout le reste affiche.** `stepMatch(state, [bits, bits])`
@@ -52,6 +52,9 @@ renvoyer des bits de boutons, comme un clavier.
   pour l'arcade et le versus ordinateur, `versusRounds` (menu VERSUS) pour
   J1 contre J2 local ; le combat en ligne garde ses règles fixes.
   `arcadeLevel` ne sert qu'à l'arcade.
+- Décors : une peinture 16:9 par arène dans `assets/backgrounds/<id>.webp`,
+  puis `python3 tools/stages/build_stages.py`. `HORIZON` y donne la ligne de
+  la peinture posée sur le bord haut du sol, que le jeu dessine lui-même.
 - La police bitmap n'a que les glyphes déclarés dans `render/font.ts` ; un
   caractère inconnu s'affiche `?`.
 - Le site spritedatabase.net est bloqué depuis les sessions cloud : les

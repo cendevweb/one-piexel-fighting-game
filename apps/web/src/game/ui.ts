@@ -30,9 +30,12 @@ export function panel(ctx: CanvasRenderingContext2D, x: number, y: number, w: nu
 export function menuBackdrop(ctx: CanvasRenderingContext2D, t: number, stage = 'marineford', tint = 'rgba(20,6,30,0.72)'): void {
     const img = stageImage(stage);
     if (img) {
-        const w = img.width * (360 / img.height);
+        // Covers the screen with some width to spare, so it can drift.
+        const k = Math.max(360 / img.height, 720 / img.width);
+        const w = img.width * k;
+        const h = img.height * k;
         const drift = (Math.sin(t / 400) + 1) * 0.5 * (w - 640);
-        ctx.drawImage(img, -drift, 0, w, 360);
+        ctx.drawImage(img, -drift, (360 - h) / 2, w, h);
     }
     ctx.fillStyle = tint;
     ctx.fillRect(0, 0, 640, 360);
