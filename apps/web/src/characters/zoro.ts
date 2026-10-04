@@ -37,37 +37,37 @@ export const zoro: CharacterDef = {
             name: 'Coup de garde', anim: 'lightA', kind: 'normal', stance: 'stand',
             durations: [3, 2, 3, 7],
             hits: [{ frames: [1, 2], box: [4, 34, 34, 14], damage: 28, guard: 'mid', hitstun: 14, blockstun: 9, push: 6, hitstop: 6, spark: 'light' }],
-            chain: ['lightB', 'crouchLight', 'heavy', 'heavyFwd', 'heavyBack', 'crouchHeavy'], cancelable: true, sfx: 'swing'
+            chain: ['lightB', 'crouchLight', 'heavy', 'heavyFwd', 'heavyBack', 'crouchHeavy'], cancelable: true, sfx: 'slash'
         },
         lightB: {
             name: 'Nitōryū — taille croisée', anim: 'lightB', kind: 'normal', stance: 'stand',
             durations: [3, 2, 3, 3, 5, 5],
             hits: [{ frames: [1, 2], box: [2, 12, 46, 46], damage: 36, guard: 'mid', hitstun: 16, blockstun: 10, push: 7, hitstop: 7, spark: 'cut' }],
-            chain: ['lightC', 'heavy', 'heavyFwd', 'crouchHeavy'], cancelable: true, sfx: 'swing'
+            chain: ['lightC', 'heavy', 'heavyFwd', 'crouchHeavy'], cancelable: true, sfx: 'slash'
         },
         lightC: {
             name: 'Nitōryū — balayage', anim: 'lightC', kind: 'normal', stance: 'stand',
             durations: [4, 3, 3, 3, 3, 4, 6, 6],
             hits: [{ frames: [3, 4], box: [0, 4, 58, 40], damage: 54, guard: 'mid', hitstun: 20, blockstun: 12, push: 20, hitstop: 9, spark: 'blade', shake: 2 }],
-            cancelable: true, sfx: 'swingHeavy'
+            cancelable: true, sfx: 'slashHeavy'
         },
         crouchLight: {
             name: 'Estoc bas', anim: 'crouchLight', kind: 'normal', stance: 'crouch',
             durations: [3, 3, 6],
             hits: [{ frames: [1, 1], box: [6, 2, 40, 16], damage: 24, guard: 'low', hitstun: 12, blockstun: 8, push: 8, hitstop: 6, spark: 'cut' }],
-            chain: ['crouchLight', 'lightB', 'crouchHeavy'], cancelable: true, sfx: 'swing'
+            chain: ['crouchLight', 'lightB', 'crouchHeavy'], cancelable: true, sfx: 'slash'
         },
         crouchHeavy: {
             name: 'Fauchage rasant', anim: 'crouchHeavy', kind: 'normal', stance: 'crouch',
             durations: [5, 3, 4, 4, 10],
             hits: [{ frames: [1, 3], box: [4, 0, 54, 20], damage: 66, guard: 'low', hitstun: 20, blockstun: 12, push: 14, knockdown: true, launch: [1.2, 2.6], hitstop: 10, spark: 'blade' }],
-            cancelable: true, sfx: 'swing'
+            cancelable: true, sfx: 'slash'
         },
         heavy: {
             name: 'Santōryū — taille des trois sabres', anim: 'heavy', kind: 'normal', stance: 'stand',
             durations: [4, 5, 3, 3, 4, 5, 6, 8],
             hits: [{ frames: [2, 4], box: [0, 4, 58, 64], damage: 74, guard: 'mid', hitstun: 21, blockstun: 14, push: 20, hitstop: 11, spark: 'blade', shake: 2 }],
-            cancelable: true, sfx: 'swingHeavy'
+            cancelable: true, sfx: 'slashHeavy'
         },
         // An overhead: the step-in vertical chop of the sheet's second row.
         heavyFwd: {
@@ -75,7 +75,7 @@ export const zoro: CharacterDef = {
             durations: [5, 4, 3, 3, 3, 4, 6, 6, 6],
             motion: [[2, 3.2, 0], [4, 0, 0]],
             hits: [{ frames: [3, 5], box: [0, 0, 50, 72], damage: 80, guard: 'high', hitstun: 22, blockstun: 14, push: 14, hitstop: 12, spark: 'blade', shake: 4 }],
-            cancelable: true, sfx: 'swingHeavy'
+            cancelable: true, sfx: 'slashHeavy'
         },
         // The spinning cut: lifts the opponent, then the crescent at the end.
         heavyBack: {
@@ -86,19 +86,19 @@ export const zoro: CharacterDef = {
                 { frames: [9, 9], box: [-4, 0, 60, 60], damage: 36, guard: 'mid', hitstun: 22, blockstun: 12, push: 10, launch: [1.6, 4.4], hitstop: 10, spark: 'blade' }
             ],
             invuln: [1, 2],
-            cancelable: true, sfx: 'swing'
+            cancelable: true, sfx: 'slash'
         },
         airLight: {
             name: 'Taille aérienne', anim: 'airLight', kind: 'normal', stance: 'air',
             durations: [3, 3, 10],
             hits: [{ frames: [1, 2], box: [-2, 0, 46, 44], damage: 34, guard: 'high', hitstun: 14, blockstun: 9, push: 8, hitstop: 7, spark: 'cut' }],
-            chain: ['airHeavy'], cancelable: true, sfx: 'swing'
+            chain: ['airHeavy'], cancelable: true, sfx: 'slash'
         },
         airHeavy: {
             name: 'Croissant aérien', anim: 'airHeavy', kind: 'normal', stance: 'air',
             durations: [4, 4, 4, 5, 8],
             hits: [{ frames: [1, 3], box: [-4, -8, 54, 56], damage: 66, guard: 'high', hitstun: 18, blockstun: 12, push: 12, hitstop: 10, spark: 'blade' }],
-            cancelable: true, landLag: 5, sfx: 'swingHeavy'
+            cancelable: true, landLag: 5, sfx: 'slashHeavy'
         },
         // Upside down, the three swords first, into the ground: ズバッ!!
         airSpecial: {
@@ -108,7 +108,7 @@ export const zoro: CharacterDef = {
             noGravity: true, landFrame: 5,
             hits: [{ frames: [2, 5], box: [-8, -10, 44, 52], damage: 84, guard: 'high', hitstun: 20, blockstun: 14, push: 16, knockdown: true, launch: [1.6, 3.6], hitstop: 12, spark: 'blade', shake: 4 }],
             fx: [[5, 'fx_spark', 18, 10], [5, 'fx_zuba', 4, 66]],
-            sfx: 'swingHeavy'
+            sfx: 'slashHeavy'
         },
         specialN: {
             name: 'Sanjūroku Pound Hō', anim: 'specialN', kind: 'special', stance: 'stand',
@@ -120,7 +120,7 @@ export const zoro: CharacterDef = {
                 hit: { damage: 80, guard: 'mid', hitstun: 22, blockstun: 16, push: 18, hitstop: 11, spark: 'blade', shake: 2 }
             },
             fx: [[5, 'fx_thrust', 44, 34], [6, 'fx_vo', 20, 70]],
-            sfx: 'swingHeavy'
+            sfx: 'slashHeavy'
         },
         // The swords crossed in front, the one in his mouth, then the dash.
         specialF: {
@@ -129,7 +129,7 @@ export const zoro: CharacterDef = {
             motion: [[4, 9.6, 0], [6, 0, 0]],
             hits: [{ frames: [4, 6], box: [-8, 4, 56, 50], damage: 96, guard: 'mid', hitstun: 24, blockstun: 14, push: 22, launch: [3.0, 3.6], hitstop: 14, spark: 'blade', shake: 4 }],
             fx: [[6, 'fx_don', 0, 72]],
-            sfx: 'swingHeavy'
+            sfx: 'slashHeavy'
         },
         // Rising flare of the swords: the reversal. ドヒュッ!!!
         specialU: {
@@ -142,7 +142,7 @@ export const zoro: CharacterDef = {
                 { frames: [4, 4], box: [-10, 20, 50, 60], damage: 44, guard: 'mid', hitstun: 24, blockstun: 16, push: 10, launch: [1.2, 7.2], hitstop: 10, spark: 'big', shake: 4 }
             ],
             fx: [[2, 'fx_pillar', 6, 0]],
-            sfx: 'swingHeavy'
+            sfx: 'slashHeavy'
         },
         specialD: {
             name: 'Tatsumaki', anim: 'specialD', kind: 'special', stance: 'stand',
@@ -152,7 +152,7 @@ export const zoro: CharacterDef = {
                 { frames: [4, 4], box: [-12, 0, 58, 72], damage: 56, guard: 'mid', hitstun: 26, blockstun: 16, push: 12, launch: [1.4, 6.6], hitstop: 12, spark: 'big', shake: 4 }
             ],
             fx: [[2, 'fx_wind', 4, 40]],
-            sfx: 'swingHeavy'
+            sfx: 'slashHeavy'
         },
         ultimate: {
             name: 'Santōryū Ōgi — Sanzen Sekai', anim: 'ultimate', kind: 'ultimate', stance: 'stand',
@@ -166,7 +166,7 @@ export const zoro: CharacterDef = {
                 { frames: [14, 14], box: [-200, 0, 250, 100], damage: 260, guard: 'mid', hitstun: 50, blockstun: 22, push: 26, launch: [2.6, 6.2], wallBounce: true, knockdown: true, guardBreak: true, hitstop: 26, spark: 'big', shake: 10 }
             ],
             fx: [[5, 'fx_thrust', 20, 36], [13, 'fx_aura', -70, 24], [14, 'fx_gogo', -40, 76, 'menace'], [14, 'fx_burst', -44, 34]],
-            sfx: 'swingHeavy'
+            sfx: 'slashHeavy'
         },
         // Two bars: the nine swords and the red Asura behind him, the rings
         // of blades, then Ichibugin cutting through.
