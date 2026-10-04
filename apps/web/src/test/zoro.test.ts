@@ -199,16 +199,29 @@ for (const foe of ['luffy', 'akainu']) {
             expect(s.fighters[1].y).toBeGreaterThan(0);
         });
 
-        it('Sanzen Sekai can be guarded: holding back blocks it, even once Zoro is through', () => {
+        it('Sanzen Sekai guarded, even once Zoro is through, breaks the guard without hurting', () => {
             for (const gap of [4, 150]) {
                 const s = fight(foe);
                 place(s, gap);
                 s.fighters[0].meter = 100;
                 const hp = s.fighters[1].health;
                 // P2 stands on the right: holding → is holding back.
-                const log = play(s, [heavy | special, ...holdFor(0, 260)], right);
+                let crushed = false;
+                let dizzy = false;
+                const log: { hits: string[]; blocks: number } = { hits: [], blocks: 0 };
+                for (const input of [heavy | special, ...holdFor(0, 260)]) {
+                    for (const e of stepMatch(s, [input, right])) {
+                        if (e.type === 'hit' && e.attacker === 0) log.hits.push(s.fighters[0].move ?? '?');
+                        if (e.type === 'block' && e.attacker === 0) log.blocks++;
+                        if (e.type === 'guardCrush' && e.side === 1) crushed = true;
+                    }
+                    if (s.fighters[1].mode === 'dizzy') dizzy = true;
+                }
                 expect(log.hits).toEqual([]);
                 expect(log.blocks).toBeGreaterThanOrEqual(1);
+                // Guarded, the last slash just breaks the guard: no damage beyond chip.
+                expect(crushed).toBe(true);
+                expect(dizzy).toBe(true);
                 expect(hp - s.fighters[1].health).toBeLessThan(80);
             }
         });

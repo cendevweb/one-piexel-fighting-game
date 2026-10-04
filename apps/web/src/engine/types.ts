@@ -82,6 +82,8 @@ export interface HitDef {
     knockdown?: boolean;
     /** Bounce off the wall behind the victim. */
     wallBounce?: boolean;
+    /** Guarded, this blow breaks the guard outright (dizzy, no extra damage). */
+    guardBreak?: boolean;
     /** Hits again every N ticks while active (rapid punches). */
     rehit?: number;
     spark?: Spark;

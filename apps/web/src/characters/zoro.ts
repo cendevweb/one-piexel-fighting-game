@@ -163,7 +163,7 @@ export const zoro: CharacterDef = {
             hits: [
                 { frames: [6, 8], box: [0, 0, 46, 64], damage: 30, guard: 'mid', hitstun: 60, blockstun: 20, push: 0, rehit: 4, hitstop: 3, spark: 'cut', shake: 2 },
                 { frames: [11, 12], box: [-30, 0, 76, 70], damage: 50, guard: 'mid', hitstun: 70, blockstun: 20, push: 0, rehit: 4, hitstop: 4, spark: 'blade', shake: 3 },
-                { frames: [14, 14], box: [-200, 0, 204, 100], damage: 260, guard: 'mid', hitstun: 50, blockstun: 22, push: 26, launch: [2.6, 6.2], wallBounce: true, knockdown: true, hitstop: 26, spark: 'big', shake: 10 }
+                { frames: [14, 14], box: [-200, 0, 250, 100], damage: 260, guard: 'mid', hitstun: 50, blockstun: 22, push: 26, launch: [2.6, 6.2], wallBounce: true, knockdown: true, guardBreak: true, hitstop: 26, spark: 'big', shake: 10 }
             ],
             fx: [[5, 'fx_thrust', 20, 36], [13, 'fx_aura', -70, 24], [14, 'fx_gogo', -40, 76, 'menace'], [14, 'fx_burst', -44, 34]],
             sfx: 'swingHeavy'
